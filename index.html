@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Talleres</title>
+  <style>
+    /* Fuente y colores */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+    :root {
+      --primary-color: #fd0100;
+      --secondary-color: #222;
+      --button-bg: #fd0100;
+      --button-hover: #700202;
+      --card-bg: #fff;
+      --card-shadow: rgba(0,0,0,0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Roboto', Arial, sans-serif;
+      background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: var(--secondary-color);
+    }
+
+    h1 {
+      color: var(--primary-color);
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    }
+
+    p {
+      font-size: 1.2rem;
+      margin-bottom: 30px;
+      color: #555;
+    }
+
+    .card {
+      background: var(--card-bg);
+      padding: 40px 60px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px var(--card-shadow);
+      text-align: center;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 15px 35px;
+      margin: 15px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: white;
+      background-color: var(--button-bg);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background-color: var(--button-hover);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+    }
+
+    @media (max-width: 500px) {
+      .card {
+        padding: 30px 20px;
+      }
+
+      .btn {
+        width: 100%;
+        padding: 15px 0;
+        margin: 10px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Control de Talleres</h1>
+    <p>Selecciona tu acceso para continuar:</p>
+    <a href="admin.html" class="btn">Acceso Admin <span style="font-weight:400;"></span></a>
+    <a href="attendee.html" class="btn">Acceso Asistente</a>
+  </div>
+
+  <!-- Firebase SDK (opcional, si lo necesitas en index) -->
+  <script type="module">
+    // Importa Firebase (modular v10+)
+    // import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    // import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    // const firebaseConfig = { /* tu config */ };
+    // const app = initializeApp(firebaseConfig);
+    // const db = getFirestore(app);
+  </script>
+</body>
+</html>

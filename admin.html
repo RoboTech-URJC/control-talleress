@@ -1,0 +1,347 @@
+<!-- admin.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - Talleres</title>
+  <style>
+    :root { --primary: #fd0100; }
+    body { font-family: Arial, sans-serif; margin: 20px; background:#f7f7f7; color:#222; }
+    h1,h2,h3 { color:var(--primary); text-align:center; }
+    .container { max-width:900px; margin:0 auto; }
+    .card { background:white; padding:16px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); margin-bottom:16px; }
+    input, select, textarea { width:100%; padding:10px; margin:6px 0; box-sizing:border-box; border-radius:6px; border:1px solid #ccc; }
+    button { background:var(--primary); color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; }
+    button.secondary { background:#007bff; }
+    .grid { display:grid; gap:12px; grid-template-columns: 1fr 1fr; }
+    .taller-item { border-left:4px solid var(--primary); padding:10px; margin-bottom:10px; border-radius:6px; }
+    .classroom-grid { display:grid; gap:6px; justify-content:center; }
+    .seat { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; border:1px solid #999; }
+    .seat.occupied { background:var(--primary); color:white; }
+    .seat.aisle { background:transparent; border:none; }
+    .small { font-size:0.9rem; color:#555; }
+    .right { text-align:right; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Panel Admin</h1>
+
+    <!-- Login -->
+    <div id="authCard" class="card">
+      <h2>Login Admin</h2>
+      <p class="small">Inicia sesión con una cuenta de administrador (Firebase Auth).</p>
+      <input id="adminEmail" type="email" placeholder="email admin">
+      <input id="adminPass" type="password" placeholder="contraseña">
+      <div style="display:flex; gap:8px;">
+        <button id="btnLogin">Entrar</button>
+        <button id="btnLogout" style="display:none;" onclick="logout()">Salir</button>
+      </div>
+      <p id="authStatus" class="small"></p>
+    </div>
+
+    <!-- Main UI -->
+    <div id="mainUI" style="display:none;">
+      <a href="index.html"><button class="secondary">← Ir a Inicio</button></a>
+
+      <div class="card">
+        <h2>Crear Nuevo Taller</h2>
+        <form id="createForm">
+          <div class="grid">
+            <div>
+              <label>Número de Asistentes:</label>
+              <input type="number" id="numAttendees" min="1" required>
+            </div>
+            <div>
+              <label>Número de Filas:</label>
+              <input type="number" id="rows" min="1" required>
+            </div>
+            <div>
+              <label>Número de Columnas:</label>
+              <input type="number" id="cols" min="1" required>
+            </div>
+            <div>
+              <label>Filas que son Pasillos (ej: 2,4):</label>
+              <input type="text" id="rowAisles" placeholder="Dejar vacío si no hay">
+            </div>
+            <div style="grid-column:1/-1;">
+              <label>Columnas que son Pasillos (ej: 2,4):</label>
+              <input type="text" id="colAisles" placeholder="Dejar vacío si no hay">
+            </div>
+          </div>
+
+          <div id="attendeesInputs"></div>
+
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button type="submit">Crear Taller</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="workshopsList" class="card">
+        <h2>Talleres Creados</h2>
+        <div id="listContainer"></div>
+      </div>
+
+      <div id="editAttendees" class="card" style="display:none;">
+        <h2>Editar Asistentes</h2>
+        <div id="editAttendeesInputs"></div>
+        <div style="text-align:right; margin-top:8px;">
+          <button onclick="saveAttendeeChanges()">Guardar Cambios</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase y scripts -->
+  <script type="module">
+    import { db, auth, signInWithEmailAndPassword, signOut } from './firebase.js';
+    import { collection, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+    // ---------- Variables ----------
+    let currentWorkshops = [];
+    let editingWorkshopId = null;
+
+    // ---------- Auth ----------
+    const adminEmail = document.getElementById('adminEmail');
+    const adminPass = document.getElementById('adminPass');
+    const btnLogin = document.getElementById('btnLogin');
+    const authStatus = document.getElementById('authStatus');
+    const authCard = document.getElementById('authCard');
+    const mainUI = document.getElementById('mainUI');
+
+    btnLogin.onclick = async () => {
+      const email = adminEmail.value.trim();
+      const pass = adminPass.value;
+      if(!email||!pass){ authStatus.textContent='Pon email y contraseña'; return;}
+      try{
+        const cred = await signInWithEmailAndPassword(auth,email,pass);
+        authStatus.textContent = 'Conectado como '+cred.user.email;
+        authCard.style.display='none';
+        mainUI.style.display='block';
+        initWorkshopsListener();
+      }catch(e){ console.error(e); authStatus.textContent='Error login: '+e.message; }
+    };
+
+    window.logout = async ()=>{
+      try{ await signOut(auth);}catch(_){}
+      authCard.style.display='block';
+      mainUI.style.display='none';
+      authStatus.textContent='';
+      currentWorkshops=[];
+      document.getElementById('listContainer').innerHTML='';
+    };
+
+    // ---------- Helpers ----------
+    function parseAisles(input){ return input? input.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n)) : []; }
+
+    function generateInputs() {
+      const num = parseInt(document.getElementById('numAttendees').value) || 0;
+      const container = document.getElementById('attendeesInputs');
+      container.innerHTML = '<h3>Datos de Asistentes</h3>';
+      for (let i=0;i<num;i++){
+        container.innerHTML += `
+          <div style="margin-bottom:8px;">
+            <label>Asistente ${i+1} - DNI:</label>
+            <input type="text" id="dni_${i}" required>
+            <label>Nombre:</label>
+            <input type="text" id="name_${i}" required>
+            <label>Correo:</label>
+            <input type="email" id="email_${i}" required>
+          </div>
+        `;
+      }
+    }
+
+    document.getElementById('numAttendees').onchange = generateInputs;
+    document.getElementById('rows').onchange = generateInputs;
+    document.getElementById('cols').onchange = generateInputs;
+    document.getElementById('rowAisles').onchange = generateInputs;
+    document.getElementById('colAisles').onchange = generateInputs;
+
+    // ---------- Crear Taller ----------
+    document.getElementById('createForm').onsubmit = async function(e){
+      e.preventDefault();
+      const num = parseInt(document.getElementById('numAttendees').value);
+      const rows = parseInt(document.getElementById('rows').value);
+      const cols = parseInt(document.getElementById('cols').value);
+      const rowAisles = parseAisles(document.getElementById('rowAisles').value);
+      const colAisles = parseAisles(document.getElementById('colAisles').value);
+      const seats = (rows - rowAisles.length)*(cols - colAisles.length);
+      if(num>seats){ alert('No hay suficientes puestos'); return;}
+
+      const attendees=[];
+      for(let i=0;i<num;i++){
+        attendees.push({
+          dni: document.getElementById(`dni_${i}`).value.trim(),
+          name: document.getElementById(`name_${i}`).value.trim(),
+          email: document.getElementById(`email_${i}`).value.trim()
+        });
+      }
+
+      const code=Math.random().toString(36).substring(2,8).toUpperCase();
+      const docData={code,numAttendees:num,rows,cols,rowAisles,colAisles,seats,attendees,assignments:[],createdAt:new Date()};
+
+      try{
+        await setDoc(doc(db,'workshops',code),docData);
+        alert('Taller creado: '+code);
+        document.getElementById('createForm').reset();
+        document.getElementById('attendeesInputs').innerHTML='';
+      }catch(err){ console.error(err); alert('Error guardando taller: '+err.message); }
+    };
+
+    // ---------- Real-time listener ----------
+    function initWorkshopsListener(){
+      const q = collection(db,"workshops");
+      onSnapshot(q,snapshot=>{
+        currentWorkshops=[];
+        snapshot.forEach(docSnap=>currentWorkshops.push({id:docSnap.id,...docSnap.data()}));
+        renderWorkshops();
+      }, err=>console.error('listen error',err));
+    }
+
+    // ---------- Render talleres ----------
+    function renderWorkshops(){
+      const container = document.getElementById('listContainer');
+      container.innerHTML='';
+      currentWorkshops.sort((a,b)=>(a.createdAt?.toMillis?.()||0)-(b.createdAt?.toMillis?.()||0));
+      currentWorkshops.forEach(ws=>{
+        const div=document.createElement('div');
+        div.className='taller-item';
+        div.innerHTML=`
+          <h3>Código: ${ws.code}</h3>
+          <p class="small">Asistentes: ${ws.numAttendees} | Puestos: ${ws.seats} (${ws.rows}x${ws.cols})</p>
+          <p class="small">Pasillos - Filas: ${ws.rowAisles?.join(',')||'Ninguno'} | Columnas: ${ws.colAisles?.join(',')||'Ninguno'}</p>
+          <p class="small">Asignaciones: ${ws.assignments?.length||0}</p>
+          <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+            <button onclick="viewAssignments('${ws.id}')">Ver Detalles</button>
+            <button onclick="editAttendees('${ws.id}')">Editar Asistentes</button>
+            <button onclick="deleteWorkshop('${ws.id}')">Eliminar</button>
+            <button onclick="uploadCSVForWorkshop('${ws.id}')">Subir CSV</button>
+            <button onclick="downloadCSVWorkshop('${ws.id}')">Descargar CSV</button>
+          </div>
+          <input type="file" id="csvFile_${ws.id}" style="display:none;" accept=".csv">
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // ---------- Funciones CSV por taller ----------
+    window.uploadCSVForWorkshop = function(workshopId){
+      const fileInput=document.getElementById(`csvFile_${workshopId}`);
+      fileInput.click();
+      fileInput.onchange=async ()=>{
+        const file=fileInput.files[0];
+        if(!file) return;
+        const text=await file.text();
+        const lines=text.split(/\r?\n/).filter(l=>l.trim());
+        const attendees=lines.map(l=>{
+          const [dni,name,email]=l.split(',').map(s=>s.trim());
+          return {dni,name,email};
+        });
+        const ws=currentWorkshops.find(w=>w.id===workshopId);
+        const seats=(ws.rows-(ws.rowAisles?.length||0))*(ws.cols-(ws.colAisles?.length||0));
+        if(attendees.length>seats){ alert('Demasiados asistentes para los puestos'); return;}
+        try{
+          await updateDoc(doc(db,'workshops',workshopId),{attendees,numAttendees:attendees.length});
+          alert(`CSV subido correctamente para taller ${ws.code}`);
+        }catch(e){ console.error(e); alert('Error subiendo CSV: '+e.message);}
+        fileInput.value='';
+      };
+    };
+
+    window.downloadCSVWorkshop=async function(workshopId){
+      try{
+        const docSnap=await getDoc(doc(db,'workshops',workshopId));
+        if(!docSnap.exists()){ alert('No existe'); return;}
+        const ws=docSnap.data();
+        let csv='Código Taller,DNI,Nombre,Correo,Puesto,Firmado\n';
+        const assignments=ws.assignments||[];
+        ws.attendees.forEach(att=>{
+          const asg=assignments.find(a=>a.dni===att.dni)||{};
+          csv+=`${ws.code},${att.dni},${att.name},${att.email},${asg.seat||''},${asg.signed?'Sí':''}\n`;
+        });
+        const encoded=encodeURI('data:text/csv;charset=utf-8,'+csv);
+        const link=document.createElement('a');
+        link.href=encoded;
+        link.download=`taller_${ws.code}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }catch(e){ console.error(e); alert('Error al descargar CSV: '+e.message);}
+    };
+
+    // ---------- Editar asistentes ----------
+    window.editAttendees=async function(id){
+      editingWorkshopId=id;
+      const docSnap=await getDoc(doc(db,'workshops',id));
+      if(!docSnap.exists()){ alert('No existe'); return;}
+      const ws=docSnap.data();
+      const container=document.getElementById('editAttendeesInputs');
+      container.innerHTML=`<h3>Editando asistentes para ${ws.code}</h3>`;
+      ws.attendees.forEach((att,idx)=>{
+        container.innerHTML+=`
+          <div style="margin-bottom:8px;">
+            <label>DNI:</label><input type="text" id="edit_dni_${idx}" value="${att.dni}">
+            <label>Nombre:</label><input type="text" id="edit_name_${idx}" value="${att.name}">
+            <label>Correo:</label><input type="email" id="edit_email_${idx}" value="${att.email}">
+            <button onclick="deleteAttendee('${id}',${idx})">Eliminar</button>
+          </div>`;
+      });
+      container.innerHTML+=`<div style="margin-top:8px;"><button onclick="addNewAttendee('${id}')">Agregar Nuevo Asistente</button></div>`;
+      document.getElementById('editAttendees').style.display='block';
+    };
+
+    window.addNewAttendee=async function(id){
+      const docRef=doc(db,'workshops',id);
+      await updateDoc(docRef,{attendees:[...((currentWorkshops.find(w=>w.id===id)?.attendees)||[]),{dni:'',name:'',email:''}]});
+      editAttendees(id);
+    };
+
+    window.deleteAttendee=async function(id,index){
+      if(!confirm('¿Eliminar este asistente?')) return;
+      const ws=currentWorkshops.find(w=>w.id===id);
+      if(!ws) return;
+      ws.attendees.splice(index,1);
+      await updateDoc(doc(db,'workshops',id),{attendees:ws.attendees,numAttendees:ws.attendees.length});
+      editAttendees(id);
+    };
+
+    window.saveAttendeeChanges=async function(){
+      if(!editingWorkshopId) return;
+      const ws=currentWorkshops.find(w=>w.id===editingWorkshopId);
+      if(!ws) return;
+      const newAtt=[];
+      for(let i=0;i<ws.attendees.length;i++){
+        const dni=document.getElementById(`edit_dni_${i}`).value.trim();
+        const name=document.getElementById(`edit_name_${i}`).value.trim();
+        const email=document.getElementById(`edit_email_${i}`).value.trim();
+        if(dni && name && email) newAtt.push({dni,name,email});
+      }
+      const seats=(ws.rows-(ws.rowAisles?.length||0))*(ws.cols-(ws.colAisles?.length||0));
+      if(newAtt.length>seats){ alert('No hay suficientes puestos'); return;}
+      await updateDoc(doc(db,'workshops',editingWorkshopId),{attendees:newAtt,numAttendees:newAtt.length});
+      document.getElementById('editAttendees').style.display='none';
+    };
+
+    window.deleteWorkshop=async function(id){
+      if(!confirm('Eliminar taller?')) return;
+      await deleteDoc(doc(db,'workshops',id));
+    };
+
+    // ---------- Ver detalles ----------
+    window.viewAssignments=async function(id){
+      const docSnap=await getDoc(doc(db,'workshops',id));
+      if(!docSnap.exists()){ alert('No existe'); return;}
+      const ws=docSnap.data();
+      let details='Asistentes:\n';
+      ws.attendees.forEach(a=>details+=`${a.dni} - ${a.name} (${a.email})\n`);
+      details+='\nAsignaciones:\n';
+      (ws.assignments||[]).forEach(a=>details+=`${a.dni} -> Puesto ${a.seat} (Firmado: ${a.signed})\n`);
+      alert(details);
+    };
+  </script>
+  <script type="module" src="./firebase.js"></script>
+</body>
+</html>

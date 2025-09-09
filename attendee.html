@@ -1,0 +1,212 @@
+<!-- attendee.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Asistente - Talleres</title>
+  <style>
+    :root { --primary:#fd0100; }
+    body { font-family: Arial, sans-serif; margin:20px; text-align:center; background:#fafafa; }
+    h1,h3 { color:var(--primary); }
+    input { padding:10px; margin:8px; border-radius:6px; border:1px solid #ccc; width:220px; }
+    button { background:var(--primary); color:white; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; }
+    .classroom-grid { display:grid; gap:10px; margin:16px auto; border:2px solid var(--primary); padding:16px; width:fit-content; }
+    .seat { width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; border:1px solid #999; }
+    .seat.available { background:#28a745; color:white; cursor:pointer; }
+    .seat.selected { background:#ffc107; color:#222; }
+    .seat.occupied { background:var(--primary); color:white; }
+    .seat.aisle { background:transparent; border:none; }
+    #lockedMessage { color:var(--primary); font-weight:bold; }
+  </style>
+</head>
+<body>
+  <h1>Acceso a Taller</h1>
+
+  <div id="codeStep">
+    <label>Código del Taller:</label><br>
+    <input id="workshopCode" placeholder="Ej: ABC123"><br>
+    <button onclick="enterCode()">Siguiente</button>
+  </div>
+
+  <div id="dniStep" style="display:none;">
+    <label>Tu DNI:</label><br>
+    <input id="dniInput" placeholder="Ej: 12345678A"><br>
+    <button onclick="verifyDNI()">Verificar</button>
+  </div>
+
+  <div id="dataStep" style="display:none;">
+    <h3>Tus Datos:</h3>
+    <p id="userData"></p>
+    <button onclick="acceptData()">Aceptar Datos</button>
+  </div>
+
+  <div id="seatStep" style="display:none;">
+    <h3>Selecciona tu Puesto</h3>
+    <p id="lockedMessage" style="display:none;">Ya tienes un asiento asignado. No puedes cambiarlo.</p>
+    <div id="classroom" class="classroom-grid"></div>
+    <div style="margin-top:8px;"><button id="confirmSeat" onclick="confirmSeat()" disabled>Confirmar</button></div>
+  </div>
+
+  <div id="modal" style="display:none;">
+    <div style="background:white;padding:16px;border-radius:8px;width:320px;margin:80px auto;border:2px solid var(--primary);">
+      <h3>Aviso Importante</h3>
+      <p>No se puede hacer pasar por otra persona. ¿Confirmas que eres el titular del DNI?</p>
+      <div style="display:flex; gap:8px; justify-content:center;">
+        <button onclick="signAndSend()">Firmar y Enviar</button>
+        <button onclick="closeModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db } from './firebase.js';
+    import { doc, getDoc, updateDoc, runTransaction } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+    let currentWorkshop = null;
+    let currentAttendee = null;
+    let selectedSeat = null;
+
+    window.enterCode = async function(){
+      const code = document.getElementById('workshopCode').value.toUpperCase().trim();
+      if (!code) { alert('Introduce código'); return; }
+      const snap = await getDoc(doc(db,"workshops",code));
+      if (!snap.exists()) { alert('Código inválido'); return; }
+      currentWorkshop = { id: snap.id, ...snap.data() };
+      document.getElementById('codeStep').style.display = 'none';
+      document.getElementById('dniStep').style.display = 'block';
+    };
+
+    window.verifyDNI = function(){
+      const dni = document.getElementById('dniInput').value.trim();
+      currentAttendee = (currentWorkshop.attendees||[]).find(a => a.dni === dni);
+      if (!currentAttendee) { alert('DNI no encontrado'); return; }
+      document.getElementById('dniStep').style.display = 'none';
+      document.getElementById('dataStep').style.display = 'block';
+      document.getElementById('userData').textContent = `${currentAttendee.name} - ${currentAttendee.email} - DNI: ${currentAttendee.dni}`;
+    };
+
+    window.acceptData = async function(){
+      // Check in Firestore if this DNI already has a signed assignment
+      const docRef = doc(db,"workshops", currentWorkshop.id);
+      const snap = await getDoc(docRef);
+      currentWorkshop = { id: snap.id, ...snap.data() };
+      const existing = (currentWorkshop.assignments||[]).find(a => a.dni === currentAttendee.dni && a.signed);
+      document.getElementById('dataStep').style.display = 'none';
+      document.getElementById('seatStep').style.display = 'block';
+      if (existing) {
+        document.getElementById('lockedMessage').style.display = 'block';
+        renderClassroom(existing.seat, true);
+        document.getElementById('confirmSeat').style.display = 'none';
+      } else {
+        renderClassroom(null, false);
+      }
+    };
+
+    function renderClassroom(lockedSeat = null, lockedMode = false){
+      const classroom = document.getElementById('classroom');
+      classroom.style.gridTemplateColumns = `repeat(${currentWorkshop.cols}, 60px)`;
+      classroom.innerHTML = '';
+
+      const occupiedSeats = (currentWorkshop.assignments||[]).map(a=>a.seat).filter(s=>s);
+      const rowAisles = currentWorkshop.rowAisles || [];
+      const colAisles = currentWorkshop.colAisles || [];
+
+      let seatNum = 1;
+      for (let row = currentWorkshop.rows; row >= 1; row--){
+        for (let col = 1; col <= currentWorkshop.cols; col++){
+          if (rowAisles.includes(row) || colAisles.includes(col)){
+            const aisle = document.createElement('div');
+            aisle.className = 'seat aisle';
+            aisle.style.width='60px'; aisle.style.height='60px';
+            classroom.appendChild(aisle);
+            continue;
+          }
+          const currentSeatNum = seatNum;
+          const seat = document.createElement('div');
+          seat.className = 'seat';
+          seat.textContent = currentSeatNum;
+
+          if (lockedMode && currentSeatNum === lockedSeat){
+            seat.classList.add('selected');
+          } else if (occupiedSeats.includes(currentSeatNum)){
+            seat.classList.add('occupied');
+          } else if (!lockedMode){
+            seat.classList.add('available');
+            seat.onclick = () => selectSeat(currentSeatNum, seat);
+          } else {
+            seat.classList.add('available');
+          }
+
+          classroom.appendChild(seat);
+          seatNum++;
+        }
+      }
+    }
+
+    function selectSeat(num, element){
+      if (selectedSeat){
+        const prev = document.querySelector('.seat.selected');
+        if (prev) prev.classList.remove('selected');
+      }
+      selectedSeat = num;
+      element.classList.add('selected');
+      document.getElementById('confirmSeat').disabled = false;
+    }
+
+    window.confirmSeat = function(){
+      if (!selectedSeat) return;
+      document.getElementById('modal').style.display = 'block';
+    };
+
+    window.closeModal = function(){
+      document.getElementById('modal').style.display = 'none';
+    };
+
+    // signAndSend: use transaction to reserve seat and avoid race
+    window.signAndSend = async function(){
+      if (!selectedSeat && selectedSeat !== 0) { alert('Selecciona un asiento'); return; }
+      const docRef = doc(db,"workshops", currentWorkshop.id);
+
+      try {
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(docRef);
+          if (!snap.exists()) throw "Taller no existe";
+          const ws = snap.data();
+          // If user already signed, disallow
+          const existingUser = (ws.assignments||[]).find(a => a.dni === currentAttendee.dni && a.signed);
+          if (existingUser) throw "Ya tienes un asiento firmado";
+
+          // Check seat availability
+          const occupied = (ws.assignments||[]).map(a=>a.seat).filter(s=>s);
+          if (occupied.includes(selectedSeat)) throw "Asiento ya ocupado";
+
+          // Add assignment
+          const newAss = {
+            dni: currentAttendee.dni,
+            name: currentAttendee.name,
+            email: currentAttendee.email,
+            seat: selectedSeat,
+            signed: true,
+            timestamp: new Date().toISOString()
+          };
+
+          const newAssignments = [...(ws.assignments||[]), newAss];
+          tx.update(docRef, { assignments: newAssignments });
+        });
+
+        alert('Asignación confirmada. No podrás modificarla.');
+        window.location.href = 'index.html';
+      } catch (err) {
+        console.error(err);
+        alert('Error reservando asiento: ' + err);
+        // reload workshop data to refresh UI
+        const snap = await getDoc(doc(db,"workshops", currentWorkshop.id));
+        currentWorkshop = { id: snap.id, ...snap.data() };
+        renderClassroom();
+      }
+    };
+  </script>
+  <script type="module" src="./firebase.js"></script>
+</body>
+</html>
