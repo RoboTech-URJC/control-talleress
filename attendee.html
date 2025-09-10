@@ -6,53 +6,102 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Asistente - Talleres</title>
   <style>
-    :root { --primary:#fd0100; }
-    body { font-family: Arial, sans-serif; margin:20px; text-align:center; background:#fafafa; }
+    :root { --primary:#fd0100; --background:#fafafa; }
+    body { font-family: Arial, sans-serif; margin:20px; text-align:center; background:var(--background); }
     h1,h3 { color:var(--primary); }
     input { padding:10px; margin:8px; border-radius:6px; border:1px solid #ccc; width:220px; }
-    button { background:var(--primary); color:white; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; }
-    .classroom-grid { display:grid; gap:10px; margin:16px auto; border:2px solid var(--primary); padding:16px; width:fit-content; }
-    .seat { width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; border:1px solid #999; }
+    button { background:var(--primary); color:white; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; transition:0.3s; }
+    button:hover { background:#c00000; }
+
+    /* Aula */
+    .classroom-grid { display:grid; gap:10px; margin:16px auto; border:2px solid var(--primary); padding:16px; width:fit-content; background:white; border-radius:10px; }
+    .seat { width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; border:1px solid #999; transition:0.3s; }
     .seat.available { background:#28a745; color:white; cursor:pointer; }
+    .seat.available:hover { background:#218838; }
     .seat.selected { background:#ffc107; color:#222; }
     .seat.occupied { background:var(--primary); color:white; }
     .seat.aisle { background:transparent; border:none; }
+
     #lockedMessage { color:var(--primary); font-weight:bold; }
+
+    /* Popup modal */
+    #modalOverlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    #modalBox {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      width: 320px;
+      animation: fadeIn 0.3s ease-in-out;
+      border: 2px solid var(--primary);
+    }
+    @keyframes fadeIn {
+      from { transform: scale(0.8); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .modal-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 15px;
+      gap: 10px;
+    }
+    .modal-buttons button {
+      flex: 1;
+      padding: 10px;
+    }
   </style>
 </head>
 <body>
   <h1>Acceso a Taller</h1>
 
+  <!-- Paso 1: Código -->
   <div id="codeStep">
     <label>Código del Taller:</label><br>
     <input id="workshopCode" placeholder="Ej: ABC123"><br>
     <button onclick="enterCode()">Siguiente</button>
   </div>
 
+  <!-- Paso 2: DNI -->
   <div id="dniStep" style="display:none;">
     <label>Tu DNI:</label><br>
     <input id="dniInput" placeholder="Ej: 12345678A"><br>
     <button onclick="verifyDNI()">Verificar</button>
   </div>
 
+  <!-- Paso 3: Datos -->
   <div id="dataStep" style="display:none;">
     <h3>Tus Datos:</h3>
     <p id="userData"></p>
+    <p>Si alguno de tus datos es incorrecto ponte en contacto con el administrador del taller. Asegurate que tu correo termina en @alumnos.urjc.es.</p>
     <button onclick="acceptData()">Aceptar Datos</button>
   </div>
 
+  <!-- Paso 4: Selección de asiento -->
   <div id="seatStep" style="display:none;">
-    <h3>Selecciona tu Puesto</h3>
+    <h3>Selecciona tu Puesto</h3><br>
+    <h2>Aquí está la pizarra</h2>
     <p id="lockedMessage" style="display:none;">Ya tienes un asiento asignado. No puedes cambiarlo.</p>
     <div id="classroom" class="classroom-grid"></div>
-    <div style="margin-top:8px;"><button id="confirmSeat" onclick="confirmSeat()" disabled>Confirmar</button></div>
+    <div style="margin-top:8px;">
+      <button id="confirmSeat" onclick="confirmSeat()" disabled>Confirmar</button>
+    </div>
   </div>
 
-  <div id="modal" style="display:none;">
-    <div style="background:white;padding:16px;border-radius:8px;width:320px;margin:80px auto;border:2px solid var(--primary);">
+  <!-- Popup de confirmación -->
+  <div id="modalOverlay">
+    <div id="modalBox">
       <h3>Aviso Importante</h3>
-      <p>No se puede hacer pasar por otra persona. ¿Confirmas que eres el titular del DNI?</p>
-      <div style="display:flex; gap:8px; justify-content:center;">
+      <p>No se puede hacer pasar por otra persona. Firmar en nombre de otra persona o utilizar una identidad que no es puede conllevar un delito de falsedad documental, puediendo conllevar la expulsión de la universidad.
+      ¿Confirmas que eres el titular del DNI y que todos tus datos son correctos?</p>
+      <div class="modal-buttons">
         <button onclick="signAndSend()">Firmar y Enviar</button>
         <button onclick="closeModal()">Cancelar</button>
       </div>
@@ -67,6 +116,7 @@
     let currentAttendee = null;
     let selectedSeat = null;
 
+    // Paso 1: Introducir código
     window.enterCode = async function(){
       const code = document.getElementById('workshopCode').value.toUpperCase().trim();
       if (!code) { alert('Introduce código'); return; }
@@ -77,6 +127,7 @@
       document.getElementById('dniStep').style.display = 'block';
     };
 
+    // Paso 2: Verificar DNI
     window.verifyDNI = function(){
       const dni = document.getElementById('dniInput').value.trim();
       currentAttendee = (currentWorkshop.attendees||[]).find(a => a.dni === dni);
@@ -86,14 +137,16 @@
       document.getElementById('userData').textContent = `${currentAttendee.name} - ${currentAttendee.email} - DNI: ${currentAttendee.dni}`;
     };
 
+    // Paso 3: Aceptar datos y pasar a selección
     window.acceptData = async function(){
-      // Check in Firestore if this DNI already has a signed assignment
       const docRef = doc(db,"workshops", currentWorkshop.id);
       const snap = await getDoc(docRef);
       currentWorkshop = { id: snap.id, ...snap.data() };
+
       const existing = (currentWorkshop.assignments||[]).find(a => a.dni === currentAttendee.dni && a.signed);
       document.getElementById('dataStep').style.display = 'none';
       document.getElementById('seatStep').style.display = 'block';
+
       if (existing) {
         document.getElementById('lockedMessage').style.display = 'block';
         renderClassroom(existing.seat, true);
@@ -103,6 +156,7 @@
       }
     };
 
+    // Renderizar el aula
     function renderClassroom(lockedSeat = null, lockedMode = false){
       const classroom = document.getElementById('classroom');
       classroom.style.gridTemplateColumns = `repeat(${currentWorkshop.cols}, 60px)`;
@@ -118,7 +172,6 @@
           if (rowAisles.includes(row) || colAisles.includes(col)){
             const aisle = document.createElement('div');
             aisle.className = 'seat aisle';
-            aisle.style.width='60px'; aisle.style.height='60px';
             classroom.appendChild(aisle);
             continue;
           }
@@ -134,8 +187,6 @@
           } else if (!lockedMode){
             seat.classList.add('available');
             seat.onclick = () => selectSeat(currentSeatNum, seat);
-          } else {
-            seat.classList.add('available');
           }
 
           classroom.appendChild(seat);
@@ -144,6 +195,7 @@
       }
     }
 
+    // Selección de asiento
     function selectSeat(num, element){
       if (selectedSeat){
         const prev = document.querySelector('.seat.selected');
@@ -154,16 +206,18 @@
       document.getElementById('confirmSeat').disabled = false;
     }
 
+    // Mostrar popup
     window.confirmSeat = function(){
       if (!selectedSeat) return;
-      document.getElementById('modal').style.display = 'block';
+      document.getElementById('modalOverlay').style.display = 'flex';
     };
 
+    // Cerrar popup
     window.closeModal = function(){
-      document.getElementById('modal').style.display = 'none';
+      document.getElementById('modalOverlay').style.display = 'none';
     };
 
-    // signAndSend: use transaction to reserve seat and avoid race
+    // Firmar y enviar usando transaction
     window.signAndSend = async function(){
       if (!selectedSeat && selectedSeat !== 0) { alert('Selecciona un asiento'); return; }
       const docRef = doc(db,"workshops", currentWorkshop.id);
@@ -173,15 +227,13 @@
           const snap = await tx.get(docRef);
           if (!snap.exists()) throw "Taller no existe";
           const ws = snap.data();
-          // If user already signed, disallow
+
           const existingUser = (ws.assignments||[]).find(a => a.dni === currentAttendee.dni && a.signed);
           if (existingUser) throw "Ya tienes un asiento firmado";
 
-          // Check seat availability
           const occupied = (ws.assignments||[]).map(a=>a.seat).filter(s=>s);
           if (occupied.includes(selectedSeat)) throw "Asiento ya ocupado";
 
-          // Add assignment
           const newAss = {
             dni: currentAttendee.dni,
             name: currentAttendee.name,
@@ -191,8 +243,7 @@
             timestamp: new Date().toISOString()
           };
 
-          const newAssignments = [...(ws.assignments||[]), newAss];
-          tx.update(docRef, { assignments: newAssignments });
+          tx.update(docRef, { assignments: [...(ws.assignments||[]), newAss] });
         });
 
         alert('Asignación confirmada. No podrás modificarla.');
@@ -200,10 +251,11 @@
       } catch (err) {
         console.error(err);
         alert('Error reservando asiento: ' + err);
-        // reload workshop data to refresh UI
         const snap = await getDoc(doc(db,"workshops", currentWorkshop.id));
         currentWorkshop = { id: snap.id, ...snap.data() };
         renderClassroom();
+      } finally {
+        closeModal();
       }
     };
   </script>
