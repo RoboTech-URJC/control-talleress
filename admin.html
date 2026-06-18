@@ -1,296 +1,412 @@
-<!-- admin.html -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin - Talleres</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Administración de talleres Robotech URJC.">
+  <title>Admin Talleres - Robotech URJC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    :root { --primary: #fd0100; }
-    body { font-family: Arial, sans-serif; margin: 20px; background:#f7f7f7; color:#222; }
-    h1,h2,h3 { color:var(--primary); text-align:center; }
-    .container { max-width:900px; margin:0 auto; }
-    .card { background:white; padding:16px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); margin-bottom:16px; }
-    input, select, textarea { width:100%; padding:10px; margin:6px 0; box-sizing:border-box; border-radius:6px; border:1px solid #ccc; }
-    button { background:var(--primary); color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; }
-    button.secondary { background:#007bff; }
-    .grid { display:grid; gap:12px; grid-template-columns: 1fr 1fr; }
-    .taller-item { border-left:4px solid var(--primary); padding:10px; margin-bottom:10px; border-radius:6px; }
-    .classroom-grid { display:grid; gap:6px; justify-content:center; margin-top:10px; }
-    .seat { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; border:1px solid #999; }
-    .seat.occupied { background:var(--primary); color:white; }
-    .seat.aisle { background:transparent; border:none; }
-    .small { font-size:0.9rem; color:#555; }
-    .right { text-align:right; }
+    :root { --red:#d71920; --red-dark:#9f1016; --ink:#17191d; --ink-soft:#343941; --muted:#626b76; --line:#dfe3e8; --paper:#fff; --soft:#f5f6f7; --soft-red:#fff3f4; --shadow:0 8px 22px rgba(17,24,39,.08); }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 10% 8%, rgba(215,25,32,.075), transparent 28rem), #f7f8f9; color:var(--ink); font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.55; }
+    a { color:inherit; }
+    .container { width:min(1180px, calc(100% - 32px)); margin:0 auto; }
+    .site-header { position:sticky; top:0; z-index:50; border-bottom:1px solid rgba(217,221,227,.92); background:rgba(255,255,255,.94); backdrop-filter:blur(14px); }
+    .nav { display:flex; align-items:center; justify-content:space-between; gap:18px; min-height:68px; }
+    .brand { display:inline-flex; align-items:center; gap:10px; color:var(--ink); font-weight:800; text-decoration:none; }
+    .brand-mark { display:grid; width:38px; height:38px; place-items:center; border:2px solid var(--red); border-radius:6px; color:var(--red); font-weight:900; line-height:1; }
+    .brand small { display:block; color:#6b7280; font-size:.74rem; font-weight:600; }
+    .nav-actions { display:flex; gap:10px; align-items:center; }
+    main { padding:42px 0 78px; }
+    main > section:first-child { margin-bottom:4px; }
+    h1,h2,h3 { color:#0c0d10; line-height:1.08; }
+    h1 { margin:0; font-size:clamp(2.2rem, 4.5vw, 4rem); }
+    .eyebrow { margin:0 0 12px; color:var(--red); font-size:.78rem; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
+    .lead { max-width:760px; color:var(--muted); font-size:1.08rem; }
+    .panel, .card, .workshop { border:1px solid var(--line); border-radius:10px; background:#fff; box-shadow:var(--shadow); }
+    .panel { padding:28px; margin-top:24px; }
+    .card { padding:22px; }
+    .card > h2, .panel > h2, .card > .eyebrow + h2 { margin-top:0; }
+    .grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; }
+    .dashboard { display:grid; grid-template-columns:minmax(0, .96fr) minmax(0, 1.04fr); gap:22px; align-items:start; margin-top:26px; }
+    label { display:grid; gap:7px; color:var(--ink-soft); font-weight:800; }
+    input, textarea, select { width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); font:inherit; transition:border-color .16s ease, box-shadow .16s ease; }
+    input:focus, textarea:focus, select:focus { outline:0; border-color:rgba(215,25,32,.5); box-shadow:0 0 0 4px rgba(215,25,32,.09); }
+    button, .button { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 16px; border:1px solid transparent; border-radius:7px; background:var(--red); color:#fff; cursor:pointer; font:inherit; font-weight:850; text-decoration:none; transition:background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+    button:hover, .button:hover { background:var(--red-dark); transform:translateY(-1px); box-shadow:0 10px 22px rgba(215,25,32,.16); }
+    button.secondary, .button.secondary { border-color:var(--line); background:#fff; color:var(--ink); }
+    button.secondary:hover, .button.secondary:hover { border-color:#c9ced6; background:#fff; }
+    .button-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .muted, .small { color:var(--muted); }
+    .small { font-size:.9rem; }
+    .status { min-height:24px; margin:12px 0 0; color:var(--muted); font-weight:800; }
+    .status.error { color:var(--red-dark); }
+    .status.ok { color:var(--red); }
+    .attendee-row, .resource-row { border:1px solid #eaecf0; border-radius:8px; padding:12px; margin-bottom:10px; background:#fcfcfd; }
+    .create-hint { margin:10px 0 0; padding:12px 14px; border:1px solid var(--line); border-left:4px solid var(--red); border-radius:8px; background:var(--soft); color:var(--muted); font-size:.92rem; font-weight:700; }
+    .admin-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:end; padding:12px; border:1px solid var(--line); border-radius:8px; background:linear-gradient(180deg,#fff,var(--soft)); }
+    .admin-toolbar label { flex:1 1 240px; }
+    .people-table { display:grid; gap:8px; margin-top:12px; }
+    .people-row { display:grid; grid-template-columns:minmax(110px,.8fr) minmax(150px,1fr) minmax(190px,1.1fr) auto; gap:8px; align-items:center; padding:10px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    .people-row input { margin:0; }
+    .people-row.is-hidden { display:none; }
+    .table-head { color:var(--muted); font-size:.78rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; background:transparent; border:0; padding:0 10px; }
+    .bulk-box { display:none; gap:10px; margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    .bulk-box.is-open { display:grid; }
+    .workshop { overflow:hidden; margin-bottom:14px; border-left:5px solid var(--red); transition:border-color .16s ease, box-shadow .16s ease; }
+    .workshop:hover { border-left-color:var(--red-dark); box-shadow:0 14px 34px rgba(17,24,39,.10); }
+    .workshop-body { padding:18px; }
+    .summary { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin:12px 0; }
+    .metric { min-height:82px; padding:13px; border:1px solid var(--line); border-radius:8px; background:linear-gradient(180deg,#fff,var(--soft)); }
+    .metric strong { display:block; color:#0c0d10; font-size:1.35rem; }
+    .classroom-scroll { overflow:auto; padding-bottom:4px; }
+    .classroom-grid { display:grid; width:fit-content; min-width:max-content; gap:6px; margin-top:10px; }
+    .seat { display:grid; width:38px; height:34px; place-items:center; border:1px solid #c8ced8; border-radius:7px; background:#fff; font-weight:900; font-size:.9rem; }
+    .seat.free { border-color:#abefc6; background:#ecfdf3; color:#087443; }
+    .seat.occupied { border-color:var(--red); background:var(--red); color:#fff; }
+    .seat.aisle { border:0; background:transparent; }
+    .resources-list { display:grid; gap:8px; margin:12px 0; }
+    .resource-chip { display:grid; gap:2px; padding:11px 13px; border:1px solid var(--line); border-left:4px solid var(--red); border-radius:8px; background:#fff; }
+    .resource-chip a { color:var(--red-dark); font-weight:850; text-decoration:none; overflow-wrap:anywhere; }
+    .resource-chip span { color:var(--muted); font-size:.88rem; }
+    .resource-row { display:grid; gap:10px; }
+    .resource-row .resource-grid { display:grid; grid-template-columns:minmax(120px,.6fr) minmax(160px,1fr); gap:10px; }
+    .resource-row textarea { min-height:90px; }
+    .edit-shell { display:grid; gap:18px; margin-top:16px; }
+    @media (max-width:980px) { .dashboard, .grid { grid-template-columns:1fr; } }
+    @media (max-width:820px) { .people-row, .resource-row .resource-grid { grid-template-columns:1fr; } .table-head { display:none; } }
+    @media (max-width:700px) { .container { width:calc(100% - 24px); } .brand small { display:none; } .nav { align-items:flex-start; flex-direction:column; padding:12px 0; } .nav-actions, button, .button { width:100%; } .summary { grid-template-columns:1fr; } .panel, .card { padding:20px; } h1 { font-size:2.25rem; } }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Panel Admin</h1>
-
-    <!-- Login -->
-    <div id="authCard" class="card">
-      <h2>Login Admin</h2>
-      <p class="small">Inicia sesión con una cuenta de administrador (Firebase Auth).</p>
-      <input id="adminEmail" type="email" placeholder="email admin">
-      <input id="adminPass" type="password" placeholder="contraseña">
-      <div style="display:flex; gap:8px;">
-        <button id="btnLogin">Entrar</button>
-        <button id="btnLogout" style="display:none;" onclick="logout()">Salir</button>
-      </div>
-      <p id="authStatus" class="small"></p>
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="index.html"><span class="brand-mark">RT</span><span>Robotech URJC <small>Administración de talleres</small></span></a>
+      <div class="nav-actions"><a class="button secondary" href="index.html">Acceso usuarios</a><button id="btnLogout" class="secondary" style="display:none;" onclick="logout()">Salir</button></div>
     </div>
+  </header>
 
-    <!-- Main UI -->
-    <div id="mainUI" style="display:none;">
-      <a href="index.html"><button class="secondary">← Ir a Inicio</button></a>
+  <main class="container">
+    <section>
+      <p class="eyebrow">Panel interno</p>
+      <h1>Gestión de asistencia y recursos.</h1>
+      <p class="lead">Crea talleres, revisa firmas, importa asistentes por CSV y publica enlaces para que las personas que ya han fichado puedan acceder a los archivos.</p>
+    </section>
 
+    <section id="authCard" class="panel">
+      <h2>Login Admin</h2>
+      <p class="small">Panel protegido con Firebase Auth. Inicia sesión con una cuenta de administrador.</p>
+      <div class="grid">
+        <label>Email admin<input id="adminEmail" type="email" placeholder="admin@robotech.es" autocomplete="email"></label>
+        <label>Contraseña<input id="adminPass" type="password" placeholder="contraseña" autocomplete="current-password"></label>
+      </div>
+      <button id="btnLogin">Entrar</button>
+      <p id="authStatus" class="status"></p>
+    </section>
+
+    <section id="mainUI" class="dashboard" style="display:none;">
       <div class="card">
-        <h2>Crear Nuevo Taller</h2>
+        <p class="eyebrow">Nuevo taller</p>
+        <h2>Crear taller</h2>
         <form id="createForm">
           <div class="grid">
-            <div>
-              <label>Número de Asistentes:</label>
-              <input type="number" id="numAttendees" min="1" required>
-            </div>
-            <div>
-              <label>Número de Filas:</label>
-              <input type="number" id="rows" min="1" required>
-            </div>
-            <div>
-              <label>Número de Columnas:</label>
-              <input type="number" id="cols" min="1" required>
-            </div>
-            <div>
-              <label>Filas que son Pasillos (ej: 2,4):</label>
-              <input type="text" id="rowAisles" placeholder="Dejar vacío si no hay">
-            </div>
-            <div style="grid-column:1/-1;">
-              <label>Columnas que son Pasillos (ej: 2,4):</label>
-              <input type="text" id="colAisles" placeholder="Dejar vacío si no hay">
-            </div>
+            <label style="grid-column:1/-1;">Nombre del taller<input type="text" id="workshopTitle" placeholder="Ej: Taller de Git y GitHub" required></label>
+            <label>Código del taller<input type="text" id="workshopCodeInput" placeholder="Ej: GIT2026" required autocomplete="off"></label>
+            <label style="grid-column:1/-1;">Descripción<textarea id="workshopDescription" rows="3" placeholder="Qué se va a hacer, requisitos o material necesario"></textarea></label>
+            <label>Lugar<input type="text" id="workshopPlace" placeholder="Ej: Aulario I, laboratorio 003"></label>
+            <label>Fecha y hora<input type="text" id="workshopSchedule" placeholder="Ej: Jueves 18:00"></label>
+            <label>Número de asistentes previsto<input type="number" id="numAttendees" min="1" required></label>
+            <label>Número de filas<input type="number" id="rows" min="1" required></label>
+            <label>Número de columnas<input type="number" id="cols" min="1" required></label>
+            <label>Filas pasillo<input type="text" id="rowAisles" placeholder="Ej: 2,4"></label>
+            <label style="grid-column:1/-1;">Columnas pasillo<input type="text" id="colAisles" placeholder="Ej: 2,4"></label>
           </div>
-
-          <div id="attendeesInputs"></div>
-
-          <!-- Preview de aula en tiempo real -->
-          <div class="card">
-            <h3>Vista Previa del Aula</h3>
-            <div id="classroomPreview" class="classroom-grid"></div>
+          <p class="create-hint">Crea primero el taller y después añade asistentes desde “Personas”, o súbelos con CSV. Así evitas rellenar formularios enormes al crear el aula.</p>
+          <div class="card" style="box-shadow:none; margin-top:14px;">
+            <h3>Vista previa del aula</h3>
+            <div class="classroom-scroll"><div id="classroomPreview" class="classroom-grid"></div></div>
           </div>
-
-          <div style="display:flex; gap:8px; margin-top:8px;">
-            <button type="submit">Crear Taller</button>
-          </div>
+          <button type="submit" style="margin-top:12px;">Crear taller</button>
         </form>
       </div>
 
-      <div id="workshopsList" class="card">
-        <h2>Talleres Creados</h2>
-        <div id="listContainer"></div>
-      </div>
+      <div>
+        <div id="workshopsList" class="card">
+          <p class="eyebrow">Talleres</p>
+          <h2>Talleres creados</h2>
+          <div id="listContainer"></div>
+        </div>
 
-      <div id="editAttendees" class="card" style="display:none;">
-        <h2>Editar Asistentes</h2>
-        <div id="editAttendeesInputs"></div>
-        <div style="text-align:right; margin-top:8px;">
-          <button onclick="saveAttendeeChanges()">Guardar Cambios</button>
+        <div id="editAttendees" class="card edit-shell" style="display:none;">
+          <div><p class="eyebrow">Personas</p><h2>Editar asistentes</h2></div>
+          <div class="admin-toolbar">
+            <label>Buscar persona<input id="peopleSearch" type="search" placeholder="DNI, nombre o correo" oninput="filterPeopleRows()"></label>
+            <button onclick="addPersonRow()">Añadir persona</button>
+            <button class="secondary" onclick="toggleBulkPeople()">Pegar CSV</button>
+          </div>
+          <div id="bulkPeople" class="bulk-box">
+            <label>Una persona por línea: DNI, nombre, correo<textarea id="bulkPeopleText" rows="7" placeholder="12345678A, Ada Lovelace, ada@alumnos.urjc.es"></textarea></label>
+            <div class="button-row"><button onclick="appendBulkPeople()">Añadir al listado</button><button class="secondary" onclick="replaceBulkPeople()">Reemplazar listado</button></div>
+          </div>
+          <div id="editAttendeesInputs"></div>
+          <div class="button-row"><button onclick="saveAttendeeChanges()">Guardar personas</button><button class="secondary" onclick="closeEditAttendees()">Cerrar</button></div>
+        </div>
+
+        <div id="editResources" class="card edit-shell" style="display:none;">
+          <div><p class="eyebrow">Recursos</p><h2>Publicar archivos</h2><p class="small">Publica enlaces, bloques de texto o archivos subidos (PDF, imágenes, ZIP, etc.). Los usuarios los verán después de fichar.</p></div>
+          <div id="editResourcesInputs"></div>
+          <div class="button-row"><button onclick="saveResourceChanges()">Guardar recursos</button><button class="secondary" onclick="closeEditResources()">Cerrar</button></div>
         </div>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 
-  <!-- Firebase y scripts -->
-    <script type="module">
-  import { db, auth, signInWithEmailAndPassword, signOut } from './firebase.js';
-  import { collection, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+  <script type="module">
+  import { db, auth, storage, onAuthStateChanged, signInWithEmailAndPassword, signOut } from './firebase.js';
+  import { collection, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+  import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-storage.js";
 
-  // ---------- Variables ----------
   let currentWorkshops = [];
   let editingWorkshopId = null;
+  let editingResourcesWorkshopId = null;
+  let unsubscribeWorkshops = null;
+  let currentAdminUser = null;
 
-  // ---------- Auth ----------
   const adminEmail = document.getElementById('adminEmail');
   const adminPass = document.getElementById('adminPass');
   const btnLogin = document.getElementById('btnLogin');
+  const btnLogout = document.getElementById('btnLogout');
   const authStatus = document.getElementById('authStatus');
   const authCard = document.getElementById('authCard');
   const mainUI = document.getElementById('mainUI');
 
+  function escapeHtml(value = '') { return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch])); }
+  function parseAisles(input){ return input? input.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n)) : []; }
+  function requireAdmin(){
+    if (currentAdminUser) return true;
+    alert('Debes iniciar sesión como administrador.');
+    return false;
+  }
+
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      currentAdminUser = user;
+      authStatus.textContent = 'Conectado como ' + user.email;
+      authStatus.className = 'status ok';
+      authCard.style.display = 'none';
+      mainUI.style.display = 'grid';
+      btnLogout.style.display = 'inline-flex';
+      initWorkshopsListener();
+    } else {
+      currentAdminUser = null;
+      authCard.style.display = 'block';
+      mainUI.style.display = 'none';
+      btnLogout.style.display = 'none';
+      if (unsubscribeWorkshops) unsubscribeWorkshops();
+      unsubscribeWorkshops = null;
+      currentWorkshops = [];
+      document.getElementById('listContainer').innerHTML = '';
+    }
+  });
+
   btnLogin.onclick = async () => {
     const email = adminEmail.value.trim();
     const pass = adminPass.value;
-    if(!email||!pass){ authStatus.textContent='Pon email y contraseña'; return;}
-    try{
-      const cred = await signInWithEmailAndPassword(auth,email,pass);
-      authStatus.textContent = 'Conectado como '+cred.user.email;
-      authCard.style.display='none';
-      mainUI.style.display='block';
-      initWorkshopsListener();
-    }catch(e){ console.error(e); authStatus.textContent='Error login: '+e.message; }
+    if(!email || !pass){ authStatus.textContent='Pon email y contraseña'; authStatus.className='status error'; return; }
+    btnLogin.disabled = true;
+    authStatus.textContent = 'Conectando...';
+    authStatus.className = 'status';
+    try { await signInWithEmailAndPassword(auth,email,pass); }
+    catch(e){ console.error(e); authStatus.textContent='Error login: '+e.message; authStatus.className='status error'; }
+    finally { btnLogin.disabled = false; }
   };
 
-  window.logout = async ()=>{
-    try{ await signOut(auth);}catch(_){}
-    authCard.style.display='block';
-    mainUI.style.display='none';
-    authStatus.textContent='';
-    currentWorkshops=[];
-    document.getElementById('listContainer').innerHTML='';
-  };
-
-  // ---------- Helpers ----------
-  function parseAisles(input){ return input? input.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n)) : []; }
+  window.logout = async () => { try { await signOut(auth); } catch(_e){} authStatus.textContent=''; };
 
   function generateInputs() {
-    const num = parseInt(document.getElementById('numAttendees').value) || 0;
-    const container = document.getElementById('attendeesInputs');
-    container.innerHTML = '<h3>Datos de Asistentes</h3>';
-    for (let i=0;i<num;i++){
-      container.innerHTML += `
-        <div style="margin-bottom:8px;">
-          <label>Asistente ${i+1} - DNI:</label>
-          <input type="text" id="dni_${i}" required>
-          <label>Nombre:</label>
-          <input type="text" id="name_${i}" required>
-          <label>Correo:</label>
-          <input type="email" id="email_${i}" required>
-        </div>
-      `;
-    }
     renderClassroomPreview();
   }
 
-  document.getElementById('numAttendees').onchange = generateInputs;
-  document.getElementById('rows').onchange = generateInputs;
-  document.getElementById('cols').onchange = generateInputs;
-  document.getElementById('rowAisles').onchange = generateInputs;
-  document.getElementById('colAisles').onchange = generateInputs;
 
-  // ---------- Render de la vista previa de la clase ----------
+  ['numAttendees','rows','cols','rowAisles','colAisles'].forEach(id => document.getElementById(id).addEventListener('input', generateInputs));
+
   function renderClassroomPreview(){
-    let rows = parseInt(document.getElementById('rows').value) || 0;
-    let cols = parseInt(document.getElementById('cols').value) || 0;
+    const rows = parseInt(document.getElementById('rows').value) || 0;
+    const cols = parseInt(document.getElementById('cols').value) || 0;
     const rowAisles = parseAisles(document.getElementById('rowAisles').value);
     const colAisles = parseAisles(document.getElementById('colAisles').value);
-    const container = document.getElementById('attendeesInputs');
-    let preview = document.getElementById('classroomPreview');
-    if(!preview){
-      preview = document.createElement('div');
-      preview.id = 'classroomPreview';
-      preview.style.display = 'grid';
-      preview.style.gap = '4px';
-      preview.style.justifyContent = 'center';
-      preview.style.marginTop = '16px';
-      container.appendChild(preview);
-    }
+    const preview = document.getElementById('classroomPreview');
     preview.innerHTML='';
-    preview.style.gridTemplateColumns = `repeat(${cols},40px)`;
+    preview.style.gridTemplateColumns = `repeat(${cols},38px)`;
     const numAttendees = parseInt(document.getElementById('numAttendees').value) || 0;
-    let attendeeIndex = 0;
-    for(let r=1;r<=rows;r++){
-      for(let c=1;c<=cols;c++){
-        const seatDiv = document.createElement('div');
-        seatDiv.classList.add('seat');
-        if(rowAisles.includes(r) || colAisles.includes(c)){
-          seatDiv.classList.add('aisle');
-        } else {
-          if(attendeeIndex < numAttendees) seatDiv.textContent = attendeeIndex+1;
-          attendeeIndex++;
-        }
-        preview.appendChild(seatDiv);
-      }
+    let seatIndex = 0;
+    for(let r=1;r<=rows;r++) for(let c=1;c<=cols;c++){
+      const seatDiv = document.createElement('div');
+      seatDiv.classList.add('seat');
+      if(rowAisles.includes(r) || colAisles.includes(c)) seatDiv.classList.add('aisle');
+      else { if(seatIndex < numAttendees) seatDiv.textContent = seatIndex+1; seatDiv.classList.add('free'); seatIndex++; }
+      preview.appendChild(seatDiv);
     }
   }
 
-  // ---------- Crear Taller ----------
   document.getElementById('createForm').onsubmit = async function(e){
     e.preventDefault();
+    if (!requireAdmin()) return;
+    const title = document.getElementById('workshopTitle').value.trim();
+    const code = document.getElementById('workshopCodeInput').value.trim().toUpperCase().replace(/\s+/g, '');
+    const description = document.getElementById('workshopDescription').value.trim();
+    const place = document.getElementById('workshopPlace').value.trim();
+    const schedule = document.getElementById('workshopSchedule').value.trim();
     const num = parseInt(document.getElementById('numAttendees').value);
     const rows = parseInt(document.getElementById('rows').value);
     const cols = parseInt(document.getElementById('cols').value);
     const rowAisles = parseAisles(document.getElementById('rowAisles').value);
     const colAisles = parseAisles(document.getElementById('colAisles').value);
     const seats = (rows - rowAisles.length)*(cols - colAisles.length);
-    if(num>seats){ alert('No hay suficientes puestos'); return;}
-
-    const attendees=[];
-    for(let i=0;i<num;i++){
-      attendees.push({
-        dni: document.getElementById(`dni_${i}`).value.trim(),
-        name: document.getElementById(`name_${i}`).value.trim(),
-        email: document.getElementById(`email_${i}`).value.trim()
-      });
-    }
-
-    const code=Math.random().toString(36).substring(2,8).toUpperCase();
-    const docData={code,numAttendees:num,rows,cols,rowAisles,colAisles,seats,attendees,assignments:[],createdAt:new Date()};
-
+    if(num>seats){ alert('No hay suficientes puestos'); return; }
+    if(!/^[A-Z0-9_-]{3,24}$/.test(code)){ alert('El código debe tener 3-24 caracteres y usar solo letras, números, guion o guion bajo.'); return; }
     try{
-      await setDoc(doc(db,'workshops',code),docData);
+      const existing = await getDoc(doc(db,'workshops',code));
+      if(existing.exists()){ alert('Ya existe un taller con ese código. Elige otro.'); return; }
+      await setDoc(doc(db,'workshops',code), { code,title,description,place,schedule,numAttendees:0,expectedAttendees:num,rows,cols,rowAisles,colAisles,seats,attendees:[],assignments:[],resources:[],createdAt:new Date() });
       alert('Taller creado: '+code);
       document.getElementById('createForm').reset();
-      document.getElementById('attendeesInputs').innerHTML='';
+      renderClassroomPreview();
     }catch(err){ console.error(err); alert('Error guardando taller: '+err.message); }
   };
 
-  // ---------- Real-time listener ----------
   function initWorkshopsListener(){
-    const q = collection(db,"workshops");
-    onSnapshot(q,snapshot=>{
+    if (unsubscribeWorkshops) return;
+    unsubscribeWorkshops = onSnapshot(collection(db,"workshops"), snapshot => {
       currentWorkshops=[];
       snapshot.forEach(docSnap=>currentWorkshops.push({id:docSnap.id,...docSnap.data()}));
       renderWorkshops();
-    }, err=>console.error('listen error',err));
+    }, err => console.error('listen error',err));
   }
 
-  // ---------- Render talleres ----------
   function renderWorkshops(){
     const container = document.getElementById('listContainer');
     container.innerHTML='';
-    currentWorkshops.sort((a,b)=>(a.createdAt?.toMillis?.()||0)-(b.createdAt?.toMillis?.()||0));
+    currentWorkshops.sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
     currentWorkshops.forEach(ws=>{
-      const div=document.createElement('div');
-      div.className='taller-item';
-      div.innerHTML=`
-        <h3>Código: ${ws.code}</h3>
-        <p class="small">Asistentes: ${ws.numAttendees} | Puestos: ${ws.seats} (${ws.rows}x${ws.cols})</p>
-        <p class="small">Pasillos - Filas: ${ws.rowAisles?.join(',')||'Ninguno'} | Columnas: ${ws.colAisles?.join(',')||'Ninguno'}</p>
-        <p class="small">Asignaciones: ${ws.assignments?.length||0}</p>
-        <div class="classroom-grid" id="workshop_${ws.id}_classroom"></div>
-        <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
-          <button onclick="viewAssignments('${ws.id}')">Ver Detalles</button>
-          <button onclick="editAttendees('${ws.id}')">Editar Asistentes</button>
-          <button onclick="deleteWorkshop('${ws.id}')">Eliminar</button>
-          <button onclick="uploadCSVForWorkshop('${ws.id}')">Subir CSV</button>
-          <button onclick="downloadCSVWorkshop('${ws.id}')">Descargar CSV</button>
-        </div>
-        <input type="file" id="csvFile_${ws.id}" style="display:none;" accept=".csv">
-      `;
+      const div=document.createElement('article');
+      div.className='workshop';
+      const resources = ws.resources || [];
+      div.innerHTML=`<div class="workshop-body"><p class="eyebrow">${escapeHtml(ws.title || 'Taller')}</p><h3>${escapeHtml(ws.title || ws.code)} · Código: ${escapeHtml(ws.code)}</h3><p class="small">${escapeHtml([ws.description, ws.place, ws.schedule].filter(Boolean).join(' · ') || 'Sin información adicional')}</p><div class="summary"><div class="metric"><strong>${(ws.attendees || []).length}</strong><span class="small">Personas</span></div><div class="metric"><strong>${ws.assignments?.length || 0}</strong><span class="small">Firmas</span></div><div class="metric"><strong>${resources.length}</strong><span class="small">Recursos</span></div></div><p class="small">Aula: ${ws.rows}x${ws.cols} · Puestos: ${ws.seats || 0}</p><p class="small">Pasillos - Filas: ${ws.rowAisles?.join(',')||'Ninguno'} · Columnas: ${ws.colAisles?.join(',')||'Ninguno'}</p><div class="classroom-scroll"><div class="classroom-grid" id="workshop_${ws.id}_classroom"></div></div><div class="resources-list" id="workshop_${ws.id}_resources"></div><div class="button-row"><button onclick="viewAssignments('${ws.id}')">Ver detalles</button><button onclick="editAttendees('${ws.id}')">Personas</button><button onclick="editResources('${ws.id}')">Recursos</button><button onclick="uploadCSVForWorkshop('${ws.id}')">Subir CSV</button><button onclick="downloadCSVWorkshop('${ws.id}')">Descargar CSV</button><button class="secondary" onclick="deleteWorkshop('${ws.id}')">Eliminar</button></div><input type="file" id="csvFile_${ws.id}" style="display:none;" accept=".csv"></div>`;
       container.appendChild(div);
-
-      // Render de la clase del taller
       const classroomDiv = document.getElementById(`workshop_${ws.id}_classroom`);
-      classroomDiv.style.gridTemplateColumns = `repeat(${ws.cols},40px)`;
-      let attendeeIndex = 0;
-      for(let r=1;r<=ws.rows;r++){
-        for(let c=1;c<=ws.cols;c++){
-          const seatDiv = document.createElement('div');
-          seatDiv.classList.add('seat');
-          if((ws.rowAisles||[]).includes(r) || (ws.colAisles||[]).includes(c)){
-            seatDiv.classList.add('aisle');
-          } else {
-            if(attendeeIndex < ws.attendees.length) seatDiv.textContent = attendeeIndex+1;
-            attendeeIndex++;
-          }
-          classroomDiv.appendChild(seatDiv);
-        }
+      classroomDiv.style.gridTemplateColumns = `repeat(${ws.cols},38px)`;
+      const assignedSeats = new Set((ws.assignments || []).map(a => a.seat));
+      let seatIndex = 0;
+      for(let r=1;r<=ws.rows;r++) for(let c=1;c<=ws.cols;c++){
+        const seatDiv = document.createElement('div');
+        seatDiv.classList.add('seat');
+        if((ws.rowAisles||[]).includes(r) || (ws.colAisles||[]).includes(c)) seatDiv.classList.add('aisle');
+        else { const seatNumber = seatIndex + 1; if(seatIndex < (ws.attendees || []).length) seatDiv.textContent = seatNumber; seatDiv.classList.add(assignedSeats.has(seatNumber) ? 'occupied' : 'free'); seatIndex++; }
+        classroomDiv.appendChild(seatDiv);
       }
+      const resourcesDiv = document.getElementById(`workshop_${ws.id}_resources`);
+      resourcesDiv.innerHTML = resources.length ? resources.map((r,i)=>`<div class="resource-chip">${r.url ? `<a href="${escapeHtml(r.url)}" target="_blank" rel="noreferrer">${escapeHtml(r.title || `Recurso ${i+1}`)}</a>` : `<strong>${escapeHtml(r.title || `Recurso ${i+1}`)}</strong>`}<span>${escapeHtml(r.type === 'text' ? (r.content || '').slice(0,120) : (r.description || r.fileName || r.url || ''))}</span></div>`).join('') : '<p class="small">Sin recursos publicados.</p>';
     });
   }
 
-  // ---------- Funciones CSV ----------
+  function resourceRowTemplate(res = {}, idx = 0) {
+    const type = res.type || (res.content ? 'text' : 'link');
+    return `<div class="resource-row" data-resource-row>
+      <div class="resource-grid">
+        <label>Tipo
+          <select data-resource-type onchange="syncResourceRow(this.closest('[data-resource-row]'))">
+            <option value="link" ${type === 'link' ? 'selected' : ''}>Enlace</option>
+            <option value="text" ${type === 'text' ? 'selected' : ''}>Bloque de texto</option>
+            <option value="file" ${type === 'file' || type === 'image' ? 'selected' : ''}>Archivo</option>
+          </select>
+        </label>
+        <label>Título<input type="text" data-resource-title value="${escapeHtml(res.title)}" placeholder="Nombre visible"></label>
+      </div>
+      <label data-link-field>URL<input type="url" data-resource-url value="${escapeHtml(res.url)}" placeholder="https://..."></label>
+      <label data-text-field>Texto<textarea data-resource-content placeholder="Contenido que verá el asistente">${escapeHtml(res.content)}</textarea></label>
+      <label data-file-field>Archivo<input type="file" data-resource-file accept="image/*,.pdf,.zip,.txt,.csv,.doc,.docx,.ppt,.pptx"></label>
+      <label>Descripción<input type="text" data-resource-desc value="${escapeHtml(res.description || res.fileName || '')}" placeholder="Opcional"></label>
+      <input type="hidden" data-existing-url value="${escapeHtml(res.url || '')}">
+      <input type="hidden" data-existing-mime value="${escapeHtml(res.mime || '')}">
+      <input type="hidden" data-existing-file-name value="${escapeHtml(res.fileName || '')}">
+      <button class="secondary" type="button" onclick="this.closest('[data-resource-row]').remove()">Eliminar recurso</button>
+    </div>`;
+  }
+
+  window.syncResourceRow = function(row){
+    const type = row.querySelector('[data-resource-type]').value;
+    row.querySelector('[data-link-field]').style.display = type === 'link' ? 'grid' : 'none';
+    row.querySelector('[data-text-field]').style.display = type === 'text' ? 'grid' : 'none';
+    row.querySelector('[data-file-field]').style.display = type === 'file' ? 'grid' : 'none';
+  };
+
+  function syncAllResourceRows(){
+    document.querySelectorAll('[data-resource-row]').forEach(row => syncResourceRow(row));
+  }
+
+  window.editResources = async function(id){
+    if (!requireAdmin()) return;
+    editingResourcesWorkshopId = id;
+    const docSnap = await getDoc(doc(db,'workshops',id));
+    if(!docSnap.exists()){ alert('No existe'); return; }
+    const ws = docSnap.data();
+    const resources = ws.resources && ws.resources.length ? ws.resources : [{type:'link', title:'', url:'', description:''}];
+    const container = document.getElementById('editResourcesInputs');
+    container.innerHTML = `<h3>Recursos para ${escapeHtml(ws.code)}</h3>` + resources.map(resourceRowTemplate).join('') + `<button type="button" onclick="addResourceRow()">Añadir recurso</button>`;
+    syncAllResourceRows();
+    document.getElementById('editResources').style.display='grid';
+    document.getElementById('editResources').scrollIntoView({behavior:'smooth', block:'start'});
+  };
+
+  window.addResourceRow = function(){
+    const button = document.querySelector('#editResourcesInputs > button:last-child');
+    button.insertAdjacentHTML('beforebegin', resourceRowTemplate({type:'link'}));
+    syncAllResourceRows();
+  };
+
+  window.saveResourceChanges = async function(){
+    if (!requireAdmin()) return;
+    if(!editingResourcesWorkshopId) return;
+    const rows = [...document.querySelectorAll('#editResourcesInputs [data-resource-row]')];
+    const resources = [];
+    for (const [idx, row] of rows.entries()) {
+      const type = row.querySelector('[data-resource-type]').value;
+      const title = row.querySelector('[data-resource-title]').value.trim();
+      const description = row.querySelector('[data-resource-desc]').value.trim();
+      if (type === 'text') {
+        const content = row.querySelector('[data-resource-content]').value.trim();
+        if (content) resources.push({ type:'text', title, description, content });
+      } else if (type === 'file') {
+        const input = row.querySelector('[data-resource-file]');
+        let url = row.querySelector('[data-existing-url]').value;
+        let mime = row.querySelector('[data-existing-mime]').value;
+        let fileName = row.querySelector('[data-existing-file-name]').value;
+        if (input.files[0]) {
+          const file = input.files[0];
+          fileName = file.name;
+          mime = file.type || 'application/octet-stream';
+          const storagePath = `workshop_resources/${editingResourcesWorkshopId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+          const fileRef = ref(storage, storagePath);
+          await uploadBytes(fileRef, file, { contentType: mime });
+          url = await getDownloadURL(fileRef);
+        }
+        if (url) resources.push({ type: mime.startsWith('image/') ? 'image' : 'file', title, description, url, mime, fileName });
+      } else {
+        const url = row.querySelector('[data-resource-url]').value.trim();
+        if (url) resources.push({ type:'link', title, description, url });
+      }
+    }
+    await updateDoc(doc(db,'workshops',editingResourcesWorkshopId), { resources });
+    document.getElementById('editResources').style.display='none';
+  };
+  window.closeEditResources = function(){ document.getElementById('editResources').style.display='none'; };
+
   window.uploadCSVForWorkshop = function(workshopId){
+    if (!requireAdmin()) return;
     const fileInput=document.getElementById(`csvFile_${workshopId}`);
     fileInput.click();
     fileInput.onchange=async ()=>{
@@ -298,113 +414,124 @@
       if(!file) return;
       const text=await file.text();
       const lines=text.split(/\r?\n/).filter(l=>l.trim());
-      const attendees=lines.map(l=>{
-        const [dni,name,email]=l.split(',').map(s=>s.trim());
-        return {dni,name,email};
-      });
+      const attendees=lines.map(l=>{ const [dni,name,email]=l.split(',').map(s=>s.trim()); return {dni:(dni || '').toUpperCase(),name,email:(email || '').toLowerCase()}; }).filter(a => a.dni && a.name && a.email);
       const ws=currentWorkshops.find(w=>w.id===workshopId);
       const seats=(ws.rows-(ws.rowAisles?.length||0))*(ws.cols-(ws.colAisles?.length||0));
-      if(attendees.length>seats){ alert('Demasiados asistentes para los puestos'); return;}
-      try{
-        await updateDoc(doc(db,'workshops',workshopId),{attendees,numAttendees:attendees.length});
-        alert(`CSV subido correctamente para taller ${ws.code}`);
-      }catch(e){ console.error(e); alert('Error subiendo CSV: '+e.message);}
+      if(attendees.length>seats){ alert('Demasiados asistentes para los puestos'); return; }
+      try{ await updateDoc(doc(db,'workshops',workshopId),{attendees,numAttendees:attendees.length}); alert(`CSV subido correctamente para taller ${ws.code}`); }
+      catch(e){ console.error(e); alert('Error subiendo CSV: '+e.message); }
       fileInput.value='';
     };
   };
 
   window.downloadCSVWorkshop=async function(workshopId){
+    if (!requireAdmin()) return;
     try{
       const docSnap=await getDoc(doc(db,'workshops',workshopId));
-      if(!docSnap.exists()){ alert('No existe'); return;}
+      if(!docSnap.exists()){ alert('No existe'); return; }
       const ws=docSnap.data();
+      const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
       let csv='Código Taller,DNI,Nombre,Correo,Puesto,Firmado\n';
       const assignments=ws.assignments||[];
-      ws.attendees.forEach(att=>{
-        const asg=assignments.find(a=>a.dni===att.dni)||{};
-        csv+=`${ws.code},${att.dni},${att.name},${att.email},${asg.seat||''},${asg.signed?'Sí':''}\n`;
-      });
-      const encoded=encodeURI('data:text/csv;charset=utf-8,'+csv);
+      (ws.attendees || []).forEach(att=>{ const asg=assignments.find(a=>a.dni===att.dni)||{}; csv+=[ws.code, att.dni, att.name, att.email, asg.seat || '', asg.signed ? 'Sí' : ''].map(csvCell).join(',') + '\n'; });
       const link=document.createElement('a');
-      link.href=encoded;
+      link.href=encodeURI('data:text/csv;charset=utf-8,'+csv);
       link.download=`taller_${ws.code}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    }catch(e){ console.error(e); alert('Error al descargar CSV: '+e.message);}
+      document.body.appendChild(link); link.click(); link.remove();
+    }catch(e){ console.error(e); alert('Error al descargar CSV: '+e.message); }
   };
 
-  // ---------- Editar asistentes ----------
+  function renderPeopleEditor(attendees = []){
+    const container=document.getElementById('editAttendeesInputs');
+    const existingHeader = container.querySelector('[data-people-title]')?.outerHTML || '';
+    container.innerHTML = existingHeader + '<div class="people-row table-head"><span>DNI</span><span>Nombre</span><span>Correo</span><span></span></div><div id="peopleRows" class="people-table"></div>';
+    attendees.forEach(att => addPersonRow(att));
+    filterPeopleRows();
+  }
+
   window.editAttendees=async function(id){
+    if (!requireAdmin()) return;
     editingWorkshopId=id;
     const docSnap=await getDoc(doc(db,'workshops',id));
-    if(!docSnap.exists()){ alert('No existe'); return;}
+    if(!docSnap.exists()){ alert('No existe'); return; }
     const ws=docSnap.data();
     const container=document.getElementById('editAttendeesInputs');
-    container.innerHTML=`<h3>Editando asistentes para ${ws.code}</h3>`;
-    ws.attendees.forEach((att,idx)=>{
-      container.innerHTML+=`
-        <div style="margin-bottom:8px;">
-          <label>DNI:</label><input type="text" id="edit_dni_${idx}" value="${att.dni}">
-          <label>Nombre:</label><input type="text" id="edit_name_${idx}" value="${att.name}">
-          <label>Correo:</label><input type="email" id="edit_email_${idx}" value="${att.email}">
-          <button onclick="deleteAttendee('${id}',${idx})">Eliminar</button>
-        </div>`;
+    container.innerHTML=`<h3 data-people-title>Personas de ${escapeHtml(ws.code)}</h3><p class="small">Edita en línea, busca rápido o pega varias personas en formato CSV.</p>`;
+    document.getElementById('editAttendees').style.display='grid';
+    document.getElementById('bulkPeople').classList.remove('is-open');
+    renderPeopleEditor(ws.attendees || []);
+    document.getElementById('editAttendees').scrollIntoView({behavior:'smooth', block:'start'});
+  };
+
+  window.addPersonRow=function(att={dni:'',name:'',email:''}){
+    const rows=document.getElementById('peopleRows');
+    if(!rows) return;
+    const row=document.createElement('div');
+    row.className='people-row';
+    row.innerHTML=`<input data-field="dni" placeholder="DNI" value="${escapeHtml(att.dni)}"><input data-field="name" placeholder="Nombre" value="${escapeHtml(att.name)}"><input data-field="email" type="email" placeholder="correo@alumnos.urjc.es" value="${escapeHtml(att.email)}"><button class="secondary" type="button" onclick="this.closest('.people-row').remove(); filterPeopleRows();">Eliminar</button>`;
+    rows.appendChild(row);
+    filterPeopleRows();
+  };
+
+  window.filterPeopleRows=function(){
+    const input=document.getElementById('peopleSearch');
+    const query=(input?.value || '').trim().toLowerCase();
+    document.querySelectorAll('#peopleRows .people-row').forEach(row=>{
+      row.classList.toggle('is-hidden', query && !row.textContent.toLowerCase().includes(query) && ![...row.querySelectorAll('input')].some(i=>i.value.toLowerCase().includes(query)));
     });
-    container.innerHTML+=`<div style="margin-top:8px;"><button onclick="addNewAttendee('${id}')">Agregar Nuevo Asistente</button></div>`;
-    document.getElementById('editAttendees').style.display='block';
   };
 
-  window.addNewAttendee=async function(id){
-    const docRef=doc(db,'workshops',id);
-    await updateDoc(docRef,{attendees:[...((currentWorkshops.find(w=>w.id===id)?.attendees)||[]),{dni:'',name:'',email:''}]});
-    editAttendees(id);
+  window.toggleBulkPeople=function(){ document.getElementById('bulkPeople').classList.toggle('is-open'); };
+
+  function parsePeopleText(){
+    const text=document.getElementById('bulkPeopleText').value;
+    return text.split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>{
+      const [dni,name,email]=line.split(',').map(value=>value.trim());
+      return {dni:(dni || '').toUpperCase(), name:name || '', email:(email || '').toLowerCase()};
+    }).filter(person=>person.dni && person.name && person.email);
+  }
+
+  window.appendBulkPeople=function(){
+    parsePeopleText().forEach(person=>addPersonRow(person));
+    document.getElementById('bulkPeopleText').value='';
   };
 
-  window.deleteAttendee=async function(id,index){
-    if(!confirm('¿Eliminar este asistente?')) return;
-    const ws=currentWorkshops.find(w=>w.id===id);
-    if(!ws) return;
-    ws.attendees.splice(index,1);
-    await updateDoc(doc(db,'workshops',id),{attendees:ws.attendees,numAttendees:ws.attendees.length});
-    editAttendees(id);
+  window.replaceBulkPeople=function(){
+    renderPeopleEditor(parsePeopleText());
+    document.getElementById('bulkPeopleText').value='';
   };
 
   window.saveAttendeeChanges=async function(){
+    if (!requireAdmin()) return;
     if(!editingWorkshopId) return;
     const ws=currentWorkshops.find(w=>w.id===editingWorkshopId);
     if(!ws) return;
-    const newAtt=[];
-    for(let i=0;i<ws.attendees.length;i++){
-      const dni=document.getElementById(`edit_dni_${i}`).value.trim();
-      const name=document.getElementById(`edit_name_${i}`).value.trim();
-      const email=document.getElementById(`edit_email_${i}`).value.trim();
-      if(dni && name && email) newAtt.push({dni,name,email});
-    }
+    const newAtt=[...document.querySelectorAll('#peopleRows .people-row')].map(row=>({
+      dni: row.querySelector('[data-field="dni"]').value.trim().toUpperCase(),
+      name: row.querySelector('[data-field="name"]').value.trim(),
+      email: row.querySelector('[data-field="email"]').value.trim().toLowerCase()
+    })).filter(person=>person.dni && person.name && person.email);
     const seats=(ws.rows-(ws.rowAisles?.length||0))*(ws.cols-(ws.colAisles?.length||0));
-    if(newAtt.length>seats){ alert('No hay suficientes puestos'); return;}
-    await updateDoc(doc(db,'workshops',editingWorkshopId),{attendees:newAtt,numAttendees:newAtt.length});
+    if(newAtt.length>seats){ alert('No hay suficientes puestos'); return; }
+    const seen=new Set();
+    const repeated=newAtt.find(person=>seen.size === seen.add(person.dni).size);
+    if(repeated && !confirm(`El DNI ${repeated.dni} está repetido. ¿Guardar igualmente?`)) return;
+    await updateDoc(doc(db,'workshops',editingWorkshopId),{attendees:newAtt,numAttendees:newAtt.length,expectedAttendees:Math.max(ws.expectedAttendees || 0, newAtt.length)});
     document.getElementById('editAttendees').style.display='none';
   };
-
-  window.deleteWorkshop=async function(id){
-    if(!confirm('Eliminar taller?')) return;
-    await deleteDoc(doc(db,'workshops',id));
-  };
-
-  // ---------- Ver detalles ----------
+  window.closeEditAttendees = function(){ document.getElementById('editAttendees').style.display='none'; };
+  window.deleteWorkshop=async function(id){ if (!requireAdmin()) return; if(!confirm('¿Eliminar taller?')) return; await deleteDoc(doc(db,'workshops',id)); };
   window.viewAssignments=async function(id){
+    if (!requireAdmin()) return;
     const docSnap=await getDoc(doc(db,'workshops',id));
-    if(!docSnap.exists()){ alert('No existe'); return;}
+    if(!docSnap.exists()){ alert('No existe'); return; }
     const ws=docSnap.data();
     let details='Asistentes:\n';
-    ws.attendees.forEach(a=>details+=`${a.dni} - ${a.name} (${a.email})\n`);
+    (ws.attendees || []).forEach(a=>details+=`${a.dni} - ${a.name} (${a.email})\n`);
     details+='\nAsignaciones:\n';
     (ws.assignments||[]).forEach(a=>details+=`${a.dni} -> Puesto ${a.seat} (Firmado: ${a.signed})\n`);
     alert(details);
   };
   </script>
-
-  <script type="module" src="./firebase.js"></script>
 </body>
 </html>
