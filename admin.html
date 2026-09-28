@@ -79,6 +79,13 @@
     @media (max-width:980px) { .dashboard, .grid { grid-template-columns:1fr; } }
     @media (max-width:820px) { .people-row, .resource-row .resource-grid { grid-template-columns:1fr; } .table-head { display:none; } }
     @media (max-width:700px) { .container { width:calc(100% - 24px); } .brand small { display:none; } .nav { align-items:flex-start; flex-direction:column; padding:12px 0; } .nav-actions, button, .button { width:100%; } .summary { grid-template-columns:1fr; } .panel, .card { padding:20px; } h1 { font-size:2.25rem; } }
+    details.tools { margin-top:12px; border-top:1px solid var(--line); padding-top:12px; }
+    summary { cursor:pointer; font-weight:700; padding:8px 0; }
+    .seat.blocked { background:#e5e7eb; color:#52525b; border:2px dashed #71717a; }
+    button.seat { min-height:34px; padding:0; box-shadow:none; }
+    dialog { width:min(480px,calc(100% - 32px)); border:1px solid var(--line); border-radius:12px; padding:24px; }
+    dialog::backdrop { background:#17191d80; }
+    .person-actions { display:flex; gap:8px; flex-wrap:wrap; }
   </style>
 </head>
 <body>
@@ -93,7 +100,7 @@
     <section>
       <p class="eyebrow">Panel interno</p>
       <h1>Gestión de asistencia y recursos.</h1>
-      <p class="lead">Crea talleres, revisa firmas, importa asistentes por CSV y publica enlaces para que las personas que ya han fichado puedan acceder a los archivos.</p>
+      <p class="lead">Crea talleres, revisa firmas, importa asistentes por CSV y sube archivos para que las personas que ya han fichado puedan acceder a los archivos.</p>
     </section>
 
     <section id="authCard" class="panel">
@@ -110,7 +117,7 @@
     <section id="mainUI" class="dashboard" style="display:none;">
       <div class="card">
         <p class="eyebrow">Nuevo taller</p>
-        <h2>Crear taller</h2>
+        <h2 id="formTitle">Crear taller</h2>
         <form id="createForm">
           <div class="grid">
             <label style="grid-column:1/-1;">Nombre del taller<input type="text" id="workshopTitle" placeholder="Ej: Taller de Git y GitHub" required></label>
@@ -129,24 +136,32 @@
             <h3>Vista previa del aula</h3>
             <div class="classroom-scroll"><div id="classroomPreview" class="classroom-grid"></div></div>
           </div>
-          <button type="submit" style="margin-top:12px;">Crear taller</button>
+          <button type="submit" style="margin-top:12px;">Guardar taller</button><button type="button" class="secondary" onclick="resetWorkshopForm()">Nuevo / cancelar</button>
         </form>
       </div>
 
       <div>
         <div id="workshopsList" class="card">
           <p class="eyebrow">Talleres</p>
-          <h2>Talleres creados</h2>
-          <div id="listContainer"></div>
+          <h2>Talleres creados</h2><label>Buscar taller<input id="workshopSearch" type="search" oninput="renderWorkshops()" placeholder="Nombre, código o lugar"></label><p id="workshopCount" class="small"></p>
+          <div id="listContainer"></div><section id="attendanceDetails" hidden></section>
         </div>
 
         <div id="editAttendees" class="card edit-shell" style="display:none;">
-          <div><p class="eyebrow">Personas</p><h2>Editar asistentes</h2></div>
+          <div><p class="eyebrow">Personas</p><h2 id="peopleTitle">Editar asistentes</h2></div>
           <div class="admin-toolbar">
             <label>Buscar persona<input id="peopleSearch" type="search" placeholder="DNI, nombre o correo" oninput="filterPeopleRows()"></label>
-            <button onclick="addPersonRow()">Añadir persona</button>
             <button class="secondary" onclick="toggleBulkPeople()">Pegar CSV</button>
           </div>
+          <form id="addPersonForm" class="resource-row">
+            <div class="grid">
+              <label>DNI<input id="newPersonDni" required placeholder="12345678A" autocomplete="off"></label>
+              <label>Nombre<input id="newPersonName" required placeholder="Nombre y apellidos" autocomplete="name"></label>
+              <label>Correo electrónico<input id="newPersonEmail" type="email" required placeholder="nombre@ejemplo.es" autocomplete="email"></label>
+            </div>
+            <button type="submit">Añadir persona</button>
+            <p id="addPersonStatus" class="small" role="status" aria-live="polite">Añade personas al listado y pulsa «Guardar personas» para guardar los cambios.</p>
+          </form>
           <div id="bulkPeople" class="bulk-box">
             <label>Una persona por línea: DNI, nombre, correo<textarea id="bulkPeopleText" rows="7" placeholder="12345678A, Ada Lovelace, ada@alumnos.urjc.es"></textarea></label>
             <div class="button-row"><button onclick="appendBulkPeople()">Añadir al listado</button><button class="secondary" onclick="replaceBulkPeople()">Reemplazar listado</button></div>
@@ -157,20 +172,25 @@
 
         <div id="editResources" class="card edit-shell" style="display:none;">
           <div><p class="eyebrow">Recursos</p><h2>Publicar archivos</h2><p class="small">Publica enlaces, bloques de texto o archivos subidos (PDF, imágenes, ZIP, etc.). Los usuarios los verán después de fichar.</p></div>
-          <div id="editResourcesInputs"></div>
+          <label>Subir archivos (máximo 25 MB por archivo)<input id="bulkFiles" type="file" multiple></label><p id="resourceStatus" role="status" aria-live="polite"></p><div id="editResourcesInputs"></div>
           <div class="button-row"><button onclick="saveResourceChanges()">Guardar recursos</button><button class="secondary" onclick="closeEditResources()">Cerrar</button></div>
         </div>
       </div>
     </section>
   </main>
 
+  <dialog id="seatDialog"><h2 id="seatDialogTitle"></h2><p id="seatDialogInfo"></p><p class="small">Liberar un puesto ocupado deshace la firma del alumno, pero mantiene su inscripción. Bloquearlo impide que se seleccione.</p><div class="button-row"><button id="releaseSeat">Liberar puesto</button><button id="blockSeat">Bloquear puesto</button><button class="secondary" onclick="document.getElementById('seatDialog').close()">Cerrar</button></div><p id="seatStatus" role="status"></p></dialog>
   <script type="module">
+  import { seatChange, personChange } from './attendance.mjs';
+  import { createRacsWorkbook, racsNicks } from './racs.mjs';
   import { db, auth, storage, onAuthStateChanged, signInWithEmailAndPassword, signOut } from './firebase.js';
-  import { collection, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-  import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-storage.js";
+  import { collection, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, runTransaction } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+  import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-storage.js";
 
   let currentWorkshops = [];
   let editingWorkshopId = null;
+  let editingDetailsId = null;
+  let peopleRole = 'attendees';
   let editingResourcesWorkshopId = null;
   let unsubscribeWorkshops = null;
   let currentAdminUser = null;
@@ -234,8 +254,8 @@
   ['numAttendees','rows','cols','rowAisles','colAisles'].forEach(id => document.getElementById(id).addEventListener('input', generateInputs));
 
   function renderClassroomPreview(){
-    const rows = parseInt(document.getElementById('rows').value) || 0;
-    const cols = parseInt(document.getElementById('cols').value) || 0;
+    const rows = Math.min(50, parseInt(document.getElementById('rows').value) || 0);
+    const cols = Math.min(50, parseInt(document.getElementById('cols').value) || 0);
     const rowAisles = parseAisles(document.getElementById('rowAisles').value);
     const colAisles = parseAisles(document.getElementById('colAisles').value);
     const preview = document.getElementById('classroomPreview');
@@ -243,7 +263,7 @@
     preview.style.gridTemplateColumns = `repeat(${cols},38px)`;
     const numAttendees = parseInt(document.getElementById('numAttendees').value) || 0;
     let seatIndex = 0;
-    for(let r=1;r<=rows;r++) for(let c=1;c<=cols;c++){
+    for(let r=rows;r>=1;r--) for(let c=1;c<=cols;c++){
       const seatDiv = document.createElement('div');
       seatDiv.classList.add('seat');
       if(rowAisles.includes(r) || colAisles.includes(c)) seatDiv.classList.add('aisle');
@@ -266,9 +286,23 @@
     const rowAisles = parseAisles(document.getElementById('rowAisles').value);
     const colAisles = parseAisles(document.getElementById('colAisles').value);
     const seats = (rows - rowAisles.length)*(cols - colAisles.length);
+    if (![rows,cols,num].every(n => Number.isInteger(n) && n > 0) || rows > 50 || cols > 50 || rowAisles.some(n => n < 1 || n > rows) || colAisles.some(n => n < 1 || n > cols) || new Set(rowAisles).size !== rowAisles.length || new Set(colAisles).size !== colAisles.length) { alert('Revisa filas, columnas y pasillos: máximo 50 filas y columnas, sin pasillos repetidos.'); return; }
     if(num>seats){ alert('No hay suficientes puestos'); return; }
     if(!/^[A-Z0-9_-]{3,24}$/.test(code)){ alert('El código debe tener 3-24 caracteres y usar solo letras, números, guion o guion bajo.'); return; }
     try{
+      if (editingDetailsId) {
+        await runTransaction(db, async tx => {
+          const target = doc(db,'workshops',editingDetailsId);
+          const snap = await tx.get(target);
+          if (!snap.exists()) throw new Error('El taller ya no existe');
+          const ws = snap.data();
+          const changed = rows !== ws.rows || cols !== ws.cols || JSON.stringify(rowAisles) !== JSON.stringify(ws.rowAisles || []) || JSON.stringify(colAisles) !== JSON.stringify(ws.colAisles || []);
+          if (changed && ((ws.assignments || []).length || (ws.blockedSeats || []).length)) throw new Error('Libera primero los puestos firmados o bloqueados antes de cambiar la distribución del aula.');
+          if ((ws.attendees || []).length > seats) throw new Error('Faltan puestos para las personas inscritas');
+          tx.update(target,{title,description,place,schedule,expectedAttendees:num,rows,cols,rowAisles,colAisles,seats});
+        });
+        resetWorkshopForm(); alert('Taller actualizado'); return;
+      }
       const existing = await getDoc(doc(db,'workshops',code));
       if(existing.exists()){ alert('Ya existe un taller con ese código. Elige otro.'); return; }
       await setDoc(doc(db,'workshops',code), { code,title,description,place,schedule,numAttendees:0,expectedAttendees:num,rows,cols,rowAisles,colAisles,seats,attendees:[],assignments:[],resources:[],createdAt:new Date() });
@@ -287,25 +321,36 @@
     }, err => console.error('listen error',err));
   }
 
-  function renderWorkshops(){
+  window.renderWorkshops = function(){
     const container = document.getElementById('listContainer');
+    const openSections = new Set([...container.querySelectorAll('details[open]')].map(el => el.closest('article').dataset.id + ':' + el.dataset.section));
     container.innerHTML='';
     currentWorkshops.sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
-    currentWorkshops.forEach(ws=>{
+    const query = document.getElementById('workshopSearch').value.toLowerCase();
+    const visible = currentWorkshops.filter(ws => [ws.title,ws.code,ws.place].join(' ').toLowerCase().includes(query));
+    document.getElementById('workshopCount').textContent = `${visible.length} talleres`;
+    visible.forEach(ws=>{
       const div=document.createElement('article');
       div.className='workshop';
+      div.dataset.id = ws.id;
       const resources = ws.resources || [];
-      div.innerHTML=`<div class="workshop-body"><p class="eyebrow">${escapeHtml(ws.title || 'Taller')}</p><h3>${escapeHtml(ws.title || ws.code)} · Código: ${escapeHtml(ws.code)}</h3><p class="small">${escapeHtml([ws.description, ws.place, ws.schedule].filter(Boolean).join(' · ') || 'Sin información adicional')}</p><div class="summary"><div class="metric"><strong>${(ws.attendees || []).length}</strong><span class="small">Personas</span></div><div class="metric"><strong>${ws.assignments?.length || 0}</strong><span class="small">Firmas</span></div><div class="metric"><strong>${resources.length}</strong><span class="small">Recursos</span></div></div><p class="small">Aula: ${ws.rows}x${ws.cols} · Puestos: ${ws.seats || 0}</p><p class="small">Pasillos - Filas: ${ws.rowAisles?.join(',')||'Ninguno'} · Columnas: ${ws.colAisles?.join(',')||'Ninguno'}</p><div class="classroom-scroll"><div class="classroom-grid" id="workshop_${ws.id}_classroom"></div></div><div class="resources-list" id="workshop_${ws.id}_resources"></div><div class="button-row"><button onclick="viewAssignments('${ws.id}')">Ver detalles</button><button onclick="editAttendees('${ws.id}')">Personas</button><button onclick="editResources('${ws.id}')">Recursos</button><button onclick="uploadCSVForWorkshop('${ws.id}')">Subir CSV</button><button onclick="downloadCSVWorkshop('${ws.id}')">Descargar CSV</button><button class="secondary" onclick="deleteWorkshop('${ws.id}')">Eliminar</button></div><input type="file" id="csvFile_${ws.id}" style="display:none;" accept=".csv"></div>`;
+      div.innerHTML=`<div class="workshop-body"><p class="eyebrow">${escapeHtml(ws.title || 'Taller')}</p><h3>${escapeHtml(ws.title || ws.code)} · Código: ${escapeHtml(ws.code)}</h3><p class="small">${escapeHtml([ws.description, ws.place, ws.schedule].filter(Boolean).join(' · ') || 'Sin información adicional')}</p><div class="summary"><div class="metric"><strong>${(ws.attendees || []).length}</strong><span class="small">Alumnos · ${new Set((ws.assignments || []).filter(a => a.signed).map(a => a.dni)).size} firmas</span></div><div class="metric"><strong>${(ws.trainers || []).length}</strong><span class="small">Formadores · ${new Set((ws.trainerSignatures || []).filter(a => a.signed).map(a => a.dni)).size} firmas</span></div><div class="metric"><strong>${resources.length}</strong><span class="small">Recursos</span></div></div><p class="small">Formadores: ${escapeHtml((ws.trainers || []).map(t => t.name + ((ws.trainerSignatures || []).some(a => a.dni === t.dni) ? " · Firmado" : " · Pendiente")).join(", ") || "Sin asignar")}</p><p class="small">Aula: ${ws.rows}x${ws.cols} · Puestos: ${ws.seats || 0}</p><details class="tools" data-section="aula"><summary>Gestionar puestos del aula</summary><p class="small">Pulsa un puesto · Verde: libre · Rojo: firmado · Gris: bloqueado</p><p class="small">Pasillos - Filas: ${ws.rowAisles?.join(',')||'Ninguno'} · Columnas: ${ws.colAisles?.join(',')||'Ninguno'}</p><div class="classroom-scroll"><div class="classroom-grid" id="workshop_${ws.id}_classroom"></div></div></details><details class="tools" data-section="resources"><summary>Recursos publicados (${resources.length})</summary><div class="resources-list" id="workshop_${ws.id}_resources"></div></details><div class="button-row"><button onclick="editAttendees('${ws.id}')">Alumnos</button><button onclick="editAttendees('${ws.id}','trainers')">Formadores</button><button class="secondary" onclick="viewAssignments('${ws.id}')">Firmas</button></div><details class="tools" data-section="tools"><summary>Más opciones</summary><div class="button-row"><button class="secondary" onclick="editWorkshop('${ws.id}')">Editar taller / aula</button><button class="secondary" onclick="copyTrainerLink('${ws.id}')">Enlace para formadores</button><button class="secondary" onclick="editResources('${ws.id}')">Gestionar recursos</button><button class="secondary" onclick="uploadCSVForWorkshop('${ws.id}')">Importar personas</button><button class="secondary" onclick="downloadRACS('${ws.id}', this)">Descargar RACS</button><button class="secondary" onclick="downloadCSVWorkshop('${ws.id}')">Descargar CSV</button><button class="secondary" onclick="deleteWorkshop('${ws.id}')">Eliminar taller</button></div></details><input type="file" id="csvFile_${ws.id}" style="display:none;" accept=".csv"></div>`;
       container.appendChild(div);
+      div.querySelectorAll('details').forEach(el => el.open = openSections.has(ws.id + ':' + el.dataset.section));
       const classroomDiv = document.getElementById(`workshop_${ws.id}_classroom`);
       classroomDiv.style.gridTemplateColumns = `repeat(${ws.cols},38px)`;
       const assignedSeats = new Set((ws.assignments || []).map(a => a.seat));
       let seatIndex = 0;
-      for(let r=1;r<=ws.rows;r++) for(let c=1;c<=ws.cols;c++){
-        const seatDiv = document.createElement('div');
+      for(let r=ws.rows;r>=1;r--) for(let c=1;c<=ws.cols;c++){
+        const seatDiv = document.createElement('button');
+        seatDiv.type = 'button';
         seatDiv.classList.add('seat');
-        if((ws.rowAisles||[]).includes(r) || (ws.colAisles||[]).includes(c)) seatDiv.classList.add('aisle');
-        else { const seatNumber = seatIndex + 1; if(seatIndex < (ws.attendees || []).length) seatDiv.textContent = seatNumber; seatDiv.classList.add(assignedSeats.has(seatNumber) ? 'occupied' : 'free'); seatIndex++; }
+        if((ws.rowAisles||[]).includes(r) || (ws.colAisles||[]).includes(c)) { seatDiv.classList.add('aisle'); seatDiv.disabled = true; seatDiv.setAttribute('aria-hidden','true'); }
+        else { const seatNumber = seatIndex + 1; seatDiv.textContent = seatNumber; const blocked = (ws.blockedSeats || []).includes(seatNumber);
+          seatDiv.classList.add(blocked ? 'blocked' : assignedSeats.has(seatNumber) ? 'occupied' : 'free');
+          seatDiv.setAttribute('aria-label', 'Puesto ' + seatNumber + (blocked ? ', bloqueado' : assignedSeats.has(seatNumber) ? ', firmado' : ', libre'));
+          seatDiv.onclick = () => openSeatAdmin(ws.id,seatNumber);
+          seatIndex++; }
         classroomDiv.appendChild(seatDiv);
       }
       const resourcesDiv = document.getElementById(`workshop_${ws.id}_resources`);
@@ -354,7 +399,7 @@
     const docSnap = await getDoc(doc(db,'workshops',id));
     if(!docSnap.exists()){ alert('No existe'); return; }
     const ws = docSnap.data();
-    const resources = ws.resources && ws.resources.length ? ws.resources : [{type:'link', title:'', url:'', description:''}];
+    const resources = ws.resources && ws.resources.length ? ws.resources : [];
     const container = document.getElementById('editResourcesInputs');
     container.innerHTML = `<h3>Recursos para ${escapeHtml(ws.code)}</h3>` + resources.map(resourceRowTemplate).join('') + `<button type="button" onclick="addResourceRow()">Añadir recurso</button>`;
     syncAllResourceRows();
@@ -364,7 +409,7 @@
 
   window.addResourceRow = function(){
     const button = document.querySelector('#editResourcesInputs > button:last-child');
-    button.insertAdjacentHTML('beforebegin', resourceRowTemplate({type:'link'}));
+    button.insertAdjacentHTML('beforebegin', resourceRowTemplate({type:'file'}));
     syncAllResourceRows();
   };
 
@@ -373,6 +418,11 @@
     if(!editingResourcesWorkshopId) return;
     const rows = [...document.querySelectorAll('#editResourcesInputs [data-resource-row]')];
     const resources = [];
+    const controls = [...document.querySelectorAll('#editResources button, #editResources input, #editResources select, #editResources textarea')];
+    controls.forEach(el => el.disabled = true);
+    const status = document.getElementById('resourceStatus');
+    status.textContent = 'Guardando…';
+    try {
     for (const [idx, row] of rows.entries()) {
       const type = row.querySelector('[data-resource-type]').value;
       const title = row.querySelector('[data-resource-title]').value.trim();
@@ -391,17 +441,28 @@
           mime = file.type || 'application/octet-stream';
           const storagePath = `workshop_resources/${editingResourcesWorkshopId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
           const fileRef = ref(storage, storagePath);
-          await uploadBytes(fileRef, file, { contentType: mime });
+          if (file.size > 25 * 1024 * 1024) throw new Error(file.name + ': supera 25 MB');
+          await new Promise((resolve,reject) => {
+            const task = uploadBytesResumable(fileRef,file,{contentType:mime});
+            task.on('state_changed', state => { status.textContent = `Subiendo ${file.name}: ${Math.round(state.bytesTransferred / state.totalBytes * 100)}%`; },reject,resolve);
+          });
           url = await getDownloadURL(fileRef);
+          row.querySelector('[data-existing-url]').value = url;
+          row.querySelector('[data-existing-mime]').value = mime;
+          row.querySelector('[data-existing-file-name]').value = fileName;
+          input.value = '';
         }
         if (url) resources.push({ type: mime.startsWith('image/') ? 'image' : 'file', title, description, url, mime, fileName });
       } else {
         const url = row.querySelector('[data-resource-url]').value.trim();
+        if (url && !/^https?:\/\//i.test(url)) throw new Error('Usa enlaces http:// o https://');
         if (url) resources.push({ type:'link', title, description, url });
       }
     }
     await updateDoc(doc(db,'workshops',editingResourcesWorkshopId), { resources });
     document.getElementById('editResources').style.display='none';
+    } catch(err) { status.textContent = 'No se guardaron los recursos. ' + (err.code?.startsWith('storage/') ? 'Comprueba que Firebase Storage está habilitado y permite subir archivos con tu cuenta. ' : '') + err.message; }
+    finally { controls.forEach(el => el.disabled = false); }
   };
   window.closeEditResources = function(){ document.getElementById('editResources').style.display='none'; };
 
@@ -413,15 +474,34 @@
       const file=fileInput.files[0];
       if(!file) return;
       const text=await file.text();
-      const lines=text.split(/\r?\n/).filter(l=>l.trim());
-      const attendees=lines.map(l=>{ const [dni,name,email]=l.split(',').map(s=>s.trim()); return {dni:(dni || '').toUpperCase(),name,email:(email || '').toLowerCase()}; }).filter(a => a.dni && a.name && a.email);
-      const ws=currentWorkshops.find(w=>w.id===workshopId);
-      const seats=(ws.rows-(ws.rowAisles?.length||0))*(ws.cols-(ws.colAisles?.length||0));
-      if(attendees.length>seats){ alert('Demasiados asistentes para los puestos'); return; }
-      try{ await updateDoc(doc(db,'workshops',workshopId),{attendees,numAttendees:attendees.length}); alert(`CSV subido correctamente para taller ${ws.code}`); }
-      catch(e){ console.error(e); alert('Error subiendo CSV: '+e.message); }
+      await editAttendees(workshopId);
+      document.getElementById('bulkPeopleText').value = text;
+      appendBulkPeople();
+      alert('CSV añadido al editor. Revisa y guarda las personas.');
       fileInput.value='';
     };
+  };
+
+  window.downloadRACS = async function(workshopId, button){
+    if (!requireAdmin()) return;
+    button.disabled = true;
+    button.textContent = 'Generando Excel…';
+    try {
+      const snapshot = await getDoc(doc(db,'workshops',workshopId));
+      if (!snapshot.exists()) throw new Error('El taller ya no existe.');
+      const ws = snapshot.data();
+      const nicks = racsNicks(ws);
+      if (!nicks.length) throw new Error('No hay alumnos ni formadores con correo para exportar.');
+      const url = URL.createObjectURL(createRacsWorkbook(nicks));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'RACS_' + String(ws.code || workshopId).replace(/[^a-zA-Z0-9_-]/g,'_') + '.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url),1000);
+    } catch(err) { alert('No se pudo descargar RACS: ' + err.message); }
+    finally { button.disabled = false; button.textContent = 'Descargar RACS'; }
   };
 
   window.downloadCSVWorkshop=async function(workshopId){
@@ -431,13 +511,17 @@
       if(!docSnap.exists()){ alert('No existe'); return; }
       const ws=docSnap.data();
       const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-      let csv='Código Taller,DNI,Nombre,Correo,Puesto,Firmado\n';
+      let csv='Código Taller,DNI,Nombre,Correo,Puesto,Firmado,Rol\n';
       const assignments=ws.assignments||[];
-      (ws.attendees || []).forEach(att=>{ const asg=assignments.find(a=>a.dni===att.dni)||{}; csv+=[ws.code, att.dni, att.name, att.email, asg.seat || '', asg.signed ? 'Sí' : ''].map(csvCell).join(',') + '\n'; });
+      (ws.attendees || []).forEach(att=>{ const asg=assignments.find(a=>a.dni===att.dni)||{}; csv+=[ws.code, att.dni, att.name, att.email, asg.seat || '', asg.signed ? 'Sí' : '', 'Asistente'].map(csvCell).join(',') + '\n'; });
+      (ws.trainers || []).forEach(person => {
+        const signature = (ws.trainerSignatures || []).find(a => a.dni === person.dni && a.signed);
+        csv += [ws.code,person.dni,person.name,person.email,'',signature ? 'Sí' : '', 'Formador'].map(csvCell).join(',') + '\n';
+      });
       const link=document.createElement('a');
-      link.href=encodeURI('data:text/csv;charset=utf-8,'+csv);
+      link.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
       link.download=`taller_${ws.code}.csv`;
-      document.body.appendChild(link); link.click(); link.remove();
+      document.body.appendChild(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(link.href),1000);
     }catch(e){ console.error(e); alert('Error al descargar CSV: '+e.message); }
   };
 
@@ -449,7 +533,12 @@
     filterPeopleRows();
   }
 
-  window.editAttendees=async function(id){
+  window.editAttendees=async function(id, role = 'attendees'){
+    peopleRole = role;
+    document.getElementById('peopleTitle').textContent = role === 'trainers' ? 'Editar formadores' : 'Editar asistentes';
+    document.getElementById('peopleSearch').value = '';
+    document.getElementById('addPersonForm').reset();
+    document.getElementById('addPersonStatus').textContent = 'Añade personas al listado y pulsa «Guardar personas» para guardar los cambios.';
     if (!requireAdmin()) return;
     editingWorkshopId=id;
     const docSnap=await getDoc(doc(db,'workshops',id));
@@ -459,8 +548,39 @@
     container.innerHTML=`<h3 data-people-title>Personas de ${escapeHtml(ws.code)}</h3><p class="small">Edita en línea, busca rápido o pega varias personas en formato CSV.</p>`;
     document.getElementById('editAttendees').style.display='grid';
     document.getElementById('bulkPeople').classList.remove('is-open');
-    renderPeopleEditor(ws.attendees || []);
+    renderPeopleEditor(ws[peopleRole] || []);
     document.getElementById('editAttendees').scrollIntoView({behavior:'smooth', block:'start'});
+  };
+
+  document.getElementById('addPersonForm').onsubmit = function(event){
+    event.preventDefault();
+    if (!requireAdmin() || !editingWorkshopId) return;
+    const status = document.getElementById('addPersonStatus');
+    const person = {
+      dni: document.getElementById('newPersonDni').value.trim().toUpperCase(),
+      name: document.getElementById('newPersonName').value.trim(),
+      email: document.getElementById('newPersonEmail').value.trim().toLowerCase()
+    };
+    if (!person.dni || !person.name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(person.email)) {
+      status.textContent = 'Completa DNI, nombre y un correo electrónico válido.';
+      return;
+    }
+    const existing = [...document.querySelectorAll('#peopleRows [data-field="dni"]')];
+    if (existing.some(input => input.value.trim().toUpperCase() === person.dni)) {
+      status.textContent = 'Ya hay una persona con ese DNI en el listado.';
+      document.getElementById('newPersonDni').focus();
+      return;
+    }
+    const workshop = currentWorkshops.find(ws => ws.id === editingWorkshopId);
+    if (peopleRole === 'attendees' && workshop && existing.length >= workshop.seats) {
+      status.textContent = 'No quedan puestos. Amplía el aula antes de añadir más asistentes.';
+      return;
+    }
+    document.getElementById('peopleSearch').value = '';
+    addPersonRow(person);
+    this.reset();
+    status.textContent = `${person.name}: persona añadida al listado. Pulsa «Guardar personas» para guardar los cambios.`;
+    document.getElementById('newPersonDni').focus();
   };
 
   window.addPersonRow=function(att={dni:'',name:'',email:''}){
@@ -485,10 +605,20 @@
 
   function parsePeopleText(){
     const text=document.getElementById('bulkPeopleText').value;
-    return text.split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>{
-      const [dni,name,email]=line.split(',').map(value=>value.trim());
+    return text.split(/\r?\n/).map(line=>line.trim()).filter(Boolean).filter(line => !/^dni[,;]/i.test(line)).map(line=>{
+      const values = [];
+      const separator = line.includes(';') ? ';' : ',';
+      let value = '', quoted = false;
+      for(let i=0;i<line.length;i++){
+        const ch = line[i];
+        if(ch === '"') { if(quoted && line[i+1] === '"') { value += '"'; i++; } else quoted = !quoted; }
+        else if(ch === separator && !quoted) { values.push(value.trim()); value = ''; }
+        else value += ch;
+      }
+      values.push(value.trim());
+      const [dni,name,email] = values;
       return {dni:(dni || '').toUpperCase(), name:name || '', email:(email || '').toLowerCase()};
-    }).filter(person=>person.dni && person.name && person.email);
+    });
   }
 
   window.appendBulkPeople=function(){
@@ -497,6 +627,7 @@
   };
 
   window.replaceBulkPeople=function(){
+    if (!confirm('¿Reemplazar las personas del editor por el CSV? Los cambios se aplican al guardar.')) return;
     renderPeopleEditor(parsePeopleText());
     document.getElementById('bulkPeopleText').value='';
   };
@@ -510,13 +641,24 @@
       dni: row.querySelector('[data-field="dni"]').value.trim().toUpperCase(),
       name: row.querySelector('[data-field="name"]').value.trim(),
       email: row.querySelector('[data-field="email"]').value.trim().toLowerCase()
-    })).filter(person=>person.dni && person.name && person.email);
+    })).filter(person=>person.dni || person.name || person.email);
+    if(newAtt.some(p => !p.dni || !p.name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email))) { alert('Completa DNI, nombre y correo válido de cada persona.'); return; }
     const seats=(ws.rows-(ws.rowAisles?.length||0))*(ws.cols-(ws.colAisles?.length||0));
-    if(newAtt.length>seats){ alert('No hay suficientes puestos'); return; }
+    if(peopleRole === 'attendees' && newAtt.length>seats){ alert('No hay suficientes puestos'); return; }
     const seen=new Set();
     const repeated=newAtt.find(person=>seen.size === seen.add(person.dni).size);
-    if(repeated && !confirm(`El DNI ${repeated.dni} está repetido. ¿Guardar igualmente?`)) return;
-    await updateDoc(doc(db,'workshops',editingWorkshopId),{attendees:newAtt,numAttendees:newAtt.length,expectedAttendees:Math.max(ws.expectedAttendees || 0, newAtt.length)});
+    if(repeated) { alert(`El DNI ${repeated.dni} está repetido.`); return; }
+    if (!confirm('¿Guardar el listado? Las personas eliminadas perderán también su firma y se liberarán sus puestos.')) return;
+    try { await runTransaction(db, async tx => {
+      const target = doc(db,'workshops',editingWorkshopId);
+      const snap = await tx.get(target);
+      if (!snap.exists()) throw new Error('El taller ya no existe');
+      const latest = snap.data();
+      const signatures = latest[peopleRole === 'trainers' ? 'trainerSignatures' : 'assignments'] || [];
+      const retained = signatures.filter(a => newAtt.some(p => p.dni === a.dni));
+      if (peopleRole === 'attendees' && newAtt.length > latest.seats) throw new Error('Faltan puestos');
+      tx.update(target, peopleRole === 'trainers' ? {trainers:newAtt,trainerSignatures:retained} : {attendees:newAtt,assignments:retained,numAttendees:newAtt.length,expectedAttendees:Math.max(latest.expectedAttendees || 0,newAtt.length)});
+    }); } catch(err) { alert('No se guardaron las personas: ' + err.message); return; }
     document.getElementById('editAttendees').style.display='none';
   };
   window.closeEditAttendees = function(){ document.getElementById('editAttendees').style.display='none'; };
@@ -526,11 +668,115 @@
     const docSnap=await getDoc(doc(db,'workshops',id));
     if(!docSnap.exists()){ alert('No existe'); return; }
     const ws=docSnap.data();
-    let details='Asistentes:\n';
-    (ws.attendees || []).forEach(a=>details+=`${a.dni} - ${a.name} (${a.email})\n`);
-    details+='\nAsignaciones:\n';
-    (ws.assignments||[]).forEach(a=>details+=`${a.dni} -> Puesto ${a.seat} (Firmado: ${a.signed})\n`);
-    alert(details);
+    const panel = document.getElementById('attendanceDetails');
+    panel.hidden = false;
+    panel.innerHTML = '<h3>Asistencia · ' + escapeHtml(ws.title || ws.code) + '</h3>' +
+      [['Asistentes',ws.attendees || [],ws.assignments || []],['Formadores',ws.trainers || [],ws.trainerSignatures || []]].map(([label,people,signatures]) =>
+        '<h3>' + label + '</h3>' + (people.length ? people.map(p => {
+          const signature = signatures.find(a => a.dni === p.dni && a.signed);
+          return '<div class="resource-chip"><strong>' + escapeHtml(p.name) + '</strong><span>' + escapeHtml(p.dni + ' · ' + p.email) + '</span><span>' + (signature ? 'Firmado' + (signature.seat ? ' · Puesto ' + signature.seat : '') + (signature.timestamp ? ' · ' + escapeHtml(new Date(signature.timestamp).toLocaleString('es-ES')) : '') : 'Pendiente de firma') + '</span></div>';
+        }).join('') : '<p class="small">Sin personas inscritas.</p>')).join('');
+    let index = 0;
+    for (const [role,people,signatures] of [['attendees',ws.attendees || [],ws.assignments || []],['trainers',ws.trainers || [],ws.trainerSignatures || []]]) {
+      for (const person of people) {
+        const card = panel.querySelectorAll('.resource-chip')[index++];
+        const actions = document.createElement('div'); actions.className = 'person-actions';
+        if (signatures.some(a => a.dni === person.dni && a.signed)) {
+          const undo = document.createElement('button'); undo.className = 'secondary'; undo.textContent = 'Deshacer firma';
+          undo.onclick = () => changePerson(id,role,person,'unsigned',undo);
+          actions.appendChild(undo);
+        }
+        const remove = document.createElement('button'); remove.className = 'secondary'; remove.textContent = 'Eliminar persona';
+        remove.onclick = () => changePerson(id,role,person,'remove',remove);
+        actions.appendChild(remove); card.appendChild(actions);
+      }
+    }
+    panel.scrollIntoView({behavior:'smooth'});
+
+  };
+
+
+  async function changePerson(id,role,person,action,button){
+    if (!requireAdmin()) return;
+    if (!confirm(action === 'remove' ? '¿Eliminar a ' + person.name + ' y su firma? Su puesto quedará libre.' : '¿Deshacer la firma de ' + person.name + '? Mantendrá su inscripción y su puesto quedará libre.')) return;
+    button.disabled = true;
+    try {
+      await runTransaction(db, async tx => {
+        const target = doc(db,'workshops',id), snap = await tx.get(target);
+        if (!snap.exists()) throw new Error('El taller ya no existe');
+        tx.update(target,personChange(snap.data(),role,person.dni,action));
+      });
+      if (editingWorkshopId === id) document.getElementById('editAttendees').style.display = 'none';
+      await viewAssignments(id);
+    } catch(err) { alert('No se pudo aplicar el cambio: ' + err.message); }
+    finally { button.disabled = false; }
+  }
+
+  window.openSeatAdmin = function(id,seat){
+    const ws = currentWorkshops.find(w => w.id === id);
+    if (!ws || !requireAdmin()) return;
+    const assigned = (ws.assignments || []).find(a => a.seat === seat);
+    const blocked = (ws.blockedSeats || []).includes(seat);
+    document.getElementById('seatDialogTitle').textContent = 'Puesto ' + seat;
+    document.getElementById('seatDialogInfo').textContent = assigned ? 'Asignado a ' + (assigned.name || assigned.dni) : blocked ? 'Puesto bloqueado' : 'Puesto libre';
+    document.getElementById('seatStatus').textContent = '';
+    document.getElementById('releaseSeat').disabled = !assigned && !blocked;
+    document.getElementById('blockSeat').disabled = blocked;
+    const apply = async action => {
+      if (!confirm(action === 'block' ? '¿Bloquear este puesto? Si tiene una firma, se deshará y se mantendrá la persona inscrita.' : '¿Liberar este puesto? Si tiene una firma, se deshará y se mantendrá la persona inscrita.')) return;
+      document.getElementById('releaseSeat').disabled = true;
+      document.getElementById('blockSeat').disabled = true;
+      try {
+        await runTransaction(db, async tx => {
+          const target = doc(db,'workshops',id), snap = await tx.get(target);
+          if (!snap.exists()) throw new Error('El taller ya no existe');
+          tx.update(target,seatChange(snap.data(),seat,action));
+        });
+        document.getElementById('seatDialog').close();
+        document.getElementById('attendanceDetails').hidden = true;
+      } catch(err) {
+        document.getElementById('seatStatus').textContent = err.message;
+        document.getElementById('releaseSeat').disabled = false;
+        document.getElementById('blockSeat').disabled = false;
+      }
+    };
+    document.getElementById('releaseSeat').onclick = () => apply('release');
+    document.getElementById('blockSeat').onclick = () => apply('block');
+    document.getElementById('seatDialog').showModal();
+  };
+
+  window.resetWorkshopForm = function(){
+    editingDetailsId = null;
+    document.getElementById('createForm').reset();
+    document.getElementById('workshopCodeInput').disabled = false;
+    document.getElementById('formTitle').textContent = 'Crear taller';
+    renderClassroomPreview();
+  };
+  window.editWorkshop = function(id){
+    const ws = currentWorkshops.find(w => w.id === id);
+    if (!ws) return;
+    editingDetailsId = id;
+    const fields = {workshopTitle:ws.title,workshopCodeInput:ws.code,workshopDescription:ws.description,workshopPlace:ws.place,workshopSchedule:ws.schedule,numAttendees:ws.expectedAttendees || ws.attendees?.length || 1,rows:ws.rows,cols:ws.cols,rowAisles:(ws.rowAisles || []).join(','),colAisles:(ws.colAisles || []).join(',')};
+    Object.entries(fields).forEach(([id,value]) => document.getElementById(id).value = value ?? '');
+    document.getElementById('workshopCodeInput').disabled = true;
+    document.getElementById('formTitle').textContent = 'Editar taller y aula';
+    renderClassroomPreview();
+    document.getElementById('createForm').scrollIntoView({behavior:'smooth'});
+  };
+  window.copyTrainerLink = async function(id){
+    const url = new URL('trainer.html',location.href); url.searchParams.set('workshop',id);
+    try { await navigator.clipboard.writeText(url.href); alert('Enlace para formadores copiado'); }
+    catch { prompt('Copia el enlace para formadores:',url.href); }
+  };
+  document.getElementById('bulkFiles').onchange = function(){
+    for(const file of this.files){
+      addResourceRow();
+      const row = [...document.querySelectorAll('[data-resource-row]')].at(-1);
+      const transfer = new DataTransfer(); transfer.items.add(file);
+      row.querySelector('[data-resource-file]').files = transfer.files;
+      row.querySelector('[data-resource-title]').value = file.name;
+    }
+    this.value = '';
   };
   </script>
 </body>

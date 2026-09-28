@@ -537,6 +537,7 @@
           seat.textContent = currentSeatNum;
           seat.setAttribute('aria-label', `Puesto ${currentSeatNum}`);
           if (lockedMode && currentSeatNum === lockedSeat) seat.classList.add('selected');
+          else if ((currentWorkshop.blockedSeats || []).includes(currentSeatNum)) { seat.classList.add('occupied'); seat.textContent = '×'; seat.disabled = true; seat.setAttribute('aria-label', 'Puesto ' + currentSeatNum + ', bloqueado'); }
           else if (occupiedSeats.includes(currentSeatNum)) { seat.classList.add('occupied'); seat.disabled = true; }
           else if (!lockedMode) { seat.classList.add('available'); seat.onclick = () => selectSeat(currentSeatNum, seat); }
           classroom.appendChild(seat);
@@ -588,6 +589,10 @@
           const snap = await tx.get(docRef);
           if (!snap.exists()) throw new Error("Taller no existe");
           const ws = snap.data();
+          if (!(ws.attendees || []).some(a => a.dni === currentAttendee.dni)) throw new Error('Ya no estás inscrito en este taller');
+          const capacity = (ws.rows - (ws.rowAisles || []).length) * (ws.cols - (ws.colAisles || []).length);
+          if (!Number.isInteger(selectedSeat) || selectedSeat < 1 || selectedSeat > capacity) throw new Error('El puesto ya no existe');
+          if ((ws.blockedSeats || []).includes(selectedSeat)) throw new Error('El administrador ha bloqueado este puesto');
           const existingUser = (ws.assignments||[]).find(a => a.dni === currentAttendee.dni && a.signed);
           if (existingUser) throw new Error("Ya tienes un asiento firmado");
           const occupied = (ws.assignments||[]).map(a=>a.seat).filter(Boolean);
