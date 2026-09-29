@@ -1,4 +1,4 @@
-import { normalizeResourceUrl } from './resource-paths.mjs';
+import { normalizeResourceUrl } from './resource-paths.mjs?v=20260929-auth1';
 export function visibility(resource) {
   return resource.visibility === undefined ? 'all' : resource.visibility;
 }

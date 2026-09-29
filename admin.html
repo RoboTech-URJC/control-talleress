@@ -37,6 +37,7 @@
     input:focus, textarea:focus, select:focus { outline:0; border-color:rgba(215,25,32,.5); box-shadow:0 0 0 4px rgba(215,25,32,.09); }
     button, .button { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 16px; border:1px solid transparent; border-radius:7px; background:var(--red); color:#fff; cursor:pointer; font:inherit; font-weight:850; text-decoration:none; transition:background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
     button:hover, .button:hover { background:var(--red-dark); transform:translateY(-1px); box-shadow:0 10px 22px rgba(215,25,32,.16); }
+    #reloadAdmin[hidden] { display:none; }
     button.secondary, .button.secondary { border-color:var(--line); background:#fff; color:var(--ink); }
     button.secondary:hover, .button.secondary:hover { border-color:#c9ced6; background:#fff; }
     .button-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
@@ -116,8 +117,8 @@
         <label>Email admin<input id="adminEmail" type="email" placeholder="admin@robotech.es" autocomplete="email"></label>
         <label>Contraseña<input id="adminPass" type="password" placeholder="contraseña" autocomplete="current-password"></label>
       </div>
-      <button id="btnLogin">Entrar</button>
-      <p id="authStatus" class="status"></p>
+      <button id="btnLogin" disabled>Cargando acceso…</button>
+      <p id="authStatus" class="status" role="status" aria-live="polite"></p><button id="reloadAdmin" type="button" class="secondary" hidden onclick="location.reload()">Reintentar carga</button>
     </section>
 
     <section id="mainUI" class="dashboard" style="display:none;">
@@ -189,12 +190,24 @@
   </main>
 
   <dialog id="seatDialog"><h2 id="seatDialogTitle"></h2><p id="seatDialogInfo"></p><p class="small">Liberar un puesto ocupado deshace la firma del alumno, pero mantiene su inscripción. Bloquearlo impide que se seleccione.</p><div class="button-row"><button id="releaseSeat">Liberar puesto</button><button id="blockSeat">Bloquear puesto</button><button class="secondary" onclick="document.getElementById('seatDialog').close()">Cerrar</button></div><p id="seatStatus" role="status"></p></dialog>
+  <script>
+    window.adminReady = false;
+    window.adminLoadFailed = function(){
+      if (window.adminReady) return;
+      document.getElementById('authStatus').textContent = 'No se ha podido cargar el acceso. Comprueba tu conexión y recarga con Ctrl+Shift+R para actualizar los archivos del panel.';
+      document.getElementById('authStatus').className = 'status error';
+      document.getElementById('btnLogin').textContent = 'Acceso no disponible';
+      document.getElementById('reloadAdmin').hidden = false;
+    };
+    window.addEventListener('error', window.adminLoadFailed);
+    window.adminLoadTimer = setTimeout(window.adminLoadFailed,15000);
+  </script>
   <script type="module">
-  import { normalizeResourceUrl, safeResourceUrl, fileNameFromUrl } from './resource-paths.mjs';
-  import { visibility, mergeResourceChanges, validateResourceInput } from './resource-access.mjs';
-  import { seatChange, personChange } from './attendance.mjs';
-  import { createRacsWorkbook, racsNicks } from './racs.mjs';
-  import { db, auth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from './firebase.js';
+  import { normalizeResourceUrl, safeResourceUrl, fileNameFromUrl } from './resource-paths.mjs?v=20260929-auth1';
+  import { visibility, mergeResourceChanges, validateResourceInput } from './resource-access.mjs?v=20260929-auth1';
+  import { seatChange, personChange } from './attendance.mjs?v=20260929-auth1';
+  import { createRacsWorkbook, racsNicks } from './racs.mjs?v=20260929-auth1';
+  import { db, auth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from './firebase.js?v=20260929-auth1';
   import { collection, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, runTransaction } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
   let currentWorkshops = [];
@@ -258,6 +271,9 @@
     finally { btnLogin.disabled = false; }
   };
 
+  for (const input of [adminEmail,adminPass]) input.addEventListener('keydown', event => {
+    if(event.key === 'Enter' && !btnLogin.disabled) { event.preventDefault(); btnLogin.click(); }
+  });
   window.logout = async () => { try { await signOut(auth); } catch(_e){} authStatus.textContent=''; };
 
   function generateInputs() {
@@ -867,6 +883,13 @@
       document.getElementById('repoPaths').value = '';
     } catch(err) { document.getElementById('resourceStatus').textContent = err.message; }
   };
+  window.adminReady = true;
+  clearTimeout(window.adminLoadTimer);
+  window.removeEventListener('error', window.adminLoadFailed);
+  document.getElementById('reloadAdmin').hidden = true;
+  btnLogin.textContent = 'Entrar';
+  btnLogin.disabled = false;
+  if (authStatus.className === 'status error') { authStatus.textContent = ''; authStatus.className = 'status'; }
   </script>
 </body>
 </html>

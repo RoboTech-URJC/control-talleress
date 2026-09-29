@@ -272,9 +272,9 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script type="module">
-    import { safeResourceUrl } from './resource-paths.mjs';
-    import { visibleResources } from './resource-access.mjs';
-    import { db } from './firebase.js';
+    import { safeResourceUrl } from './resource-paths.mjs?v=20260929-auth1';
+    import { visibleResources } from './resource-access.mjs?v=20260929-auth1';
+    import { db } from './firebase.js?v=20260929-auth1';
     import { doc, getDoc, runTransaction, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
     let currentWorkshop = null;
