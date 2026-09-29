@@ -272,6 +272,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script type="module">
+    import { safeResourceUrl } from './resource-paths.mjs';
     import { visibleResources } from './resource-access.mjs';
     import { db } from './firebase.js';
     import { doc, getDoc, runTransaction, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
@@ -421,13 +422,16 @@
           if (resource.type === 'text') {
             const text = document.createElement('p');
             text.textContent = resource.content || resource.description || '';
+            text.style.whiteSpace = 'pre-wrap';
             card.appendChild(text);
           } else if ((resource.mime || '').startsWith('image/') || resource.type === 'image') {
-            if (resource.url) {
+            if (safeResourceUrl(resource.url)) {
               const img = document.createElement('img');
-              img.src = resource.url;
+              img.src = safeResourceUrl(resource.url);
               img.alt = resource.title || `Recurso ${index + 1}`;
+              img.loading = 'lazy';
               card.appendChild(img);
+              const open = document.createElement('a'); open.href = safeResourceUrl(resource.url); open.target = '_blank'; open.rel = 'noopener noreferrer'; open.textContent = 'Abrir imagen'; card.appendChild(open);
             }
             if (resource.description) {
               const description = document.createElement('span');
@@ -440,9 +444,9 @@
               description.textContent = resource.description;
               card.appendChild(description);
             }
-            if (resource.url) {
+            if (safeResourceUrl(resource.url)) {
               const link = document.createElement('a');
-              link.href = resource.url;
+              link.href = safeResourceUrl(resource.url);
               link.target = '_blank';
               link.rel = 'noreferrer';
               link.className = 'button secondary';

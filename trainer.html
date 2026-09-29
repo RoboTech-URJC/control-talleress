@@ -75,6 +75,7 @@
 <section class="panel"><form id="lookup"><label>Código del taller<input id="code" required pattern="[A-Za-z0-9_-]{3,24}" autocomplete="off"></label><label>DNI<input id="dni" required autocomplete="off"></label><button style="margin-top:16px">Comprobar datos</button></form>
 <div id="confirmation" hidden><h2 id="workshopTitle"></h2><p id="details"></p><label style="display:flex;align-items:center"><input id="consent" type="checkbox" style="width:auto">Confirmo que soy esta persona y que he impartido este taller.</label><button id="sign" style="margin-top:16px">Firmar como formador</button></div><p id="status" role="status" aria-live="polite"></p></section><section id="trainerResources" class="panel" hidden><h2>Recursos del taller</h2><p class="small">Puedes publicar para todos los recursos de «Solo formadores».</p><div id="trainerResourceList" class="resources-list"></div><p id="resourceStatus" role="status" aria-live="polite"></p></section></main>
 <script type="module">
+import {safeResourceUrl} from './resource-paths.mjs';
 import {visibleResources, visibility, publishResource} from './resource-access.mjs';
 import {db} from './firebase.js';
 import {doc,getDoc,runTransaction,onSnapshot} from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
@@ -107,8 +108,8 @@ function showResources(personId){
       if(resource.content || resource.description){
         const text = document.createElement('p'); text.style.whiteSpace = 'pre-wrap'; text.textContent = resource.content || resource.description; card.appendChild(text);
       }
-      if(resource.url && /^https?:\/\//i.test(resource.url)){
-        const link = document.createElement('a'); link.href = resource.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Abrir recurso'; card.appendChild(link);
+      if(safeResourceUrl(resource.url)){
+        const link = document.createElement('a'); link.href = safeResourceUrl(resource.url); link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Abrir recurso'; card.appendChild(link);
       }
       if(visibility(resource) === 'trainers' && resource.id){
         const button = document.createElement('button'); button.className = 'secondary'; button.textContent = 'Publicar para todos';

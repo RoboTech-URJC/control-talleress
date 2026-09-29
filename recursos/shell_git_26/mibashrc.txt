@@ -1,0 +1,74 @@
+
+alias outlook='google-chrome https://outlook.office.com/mail/'
+alias gmail='google-chrome https://mail.google.com/mail/u/0/?tab=rm&ogbl#inbox'
+alias GPT='google-chrome https://chatgpt.com/'
+alias chatgpt='GPT'
+alias chat='GPT'
+alias chati='GPT'
+alias gpt='GPT'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias ga='git add .'
+alias gc='git commit -m'
+alias gp='git push'
+alias update='sudo apt update && sudo apt upgrade -y'  # Para Debian/Ubuntu
+alias github='google-chrome https://github.com'
+alias please='sudo $(fc -ln -1)'  # Ejecuta el último comando con sudo si olvidaste ponerlo
+alias fuck='sudo $(fc -ln -1)'  # Alternativa divertida para lo mismo
+alias tiempo='curl wttr.in'  # Ver el clima en la terminal
+alias tetris='tint'  # Juega Tetris en la terminal (requiere `tint`)
+alias snake='nsnake'  # Juega Snake en la terminal (requiere `nsnake`)
+alias pacman='pacman4console'  # Pac-Man en la terminal (requiere `pacman4console`)
+alias gforce='ga && gc "force commit" && gp'
+alias rcedit='nano ~/.bashrc'
+alias unissh='ssh manza@f-l3109-pc03.aulas.eif.urjc.es'
+
+# Función para inicializar Conda bajo demanda
+condabegin() {
+    __conda_setup="$('/home/manza/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+    if [ $? -eq 0 ]; then
+        eval "$__conda_setup"
+    else
+        if [ -f "/home/manza/miniconda3/etc/profile.d/conda.sh" ]; then
+            . "/home/manza/miniconda3/etc/profile.d/conda.sh"
+        else
+            export PATH="/home/manza/miniconda3/bin:$PATH"
+        fi
+    fi
+    unset __conda_setup
+    echo "Conda inicializado correctamente."
+}
+
+extract() {
+  if [ -f $1 ] ; then
+    case $1 in
+      *.tar.bz2)   tar xjf $1     ;;
+      *.tar.gz)    tar xzf $1     ;;
+      *.bz2)       bunzip2 $1     ;;
+      *.rar)       unrar x $1     ;;
+      *.gz)        gunzip $1      ;;
+      *.tar)       tar xf $1      ;;
+      *.tbz2)      tar xjf $1     ;;
+      *.tgz)       tar xzf $1     ;;
+      *.zip)       unzip $1       ;;
+      *.Z)         uncompress $1  ;;
+      *.7z)        7z x $1        ;;
+      *)           echo "'$1' no puede ser extraído vía extract()" ;;
+    esac
+  else
+    echo "'$1' no es un archivo válido"
+  fi
+}
+
+alias starwars='telnet -4 towel.blinkenlights.nl'
+
+# Función para cambiar el título de la ventana
+setTermName() {
+    if [ -z "$1" ]; then
+        echo "Uso: setTermName 'nuevo nombre'"
+    else
+        echo -ne "\033]0;$1\007"
+    fi
+}
+
