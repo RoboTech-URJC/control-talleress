@@ -73,24 +73,78 @@
   </style></head>
 <body><main class="container" style="max-width:680px"><p class="eyebrow">Robotech · Formadores</p><h1>Firma de asistencia</h1><p class="lead">Acceso para los formadores inscritos en el taller. No necesitas reservar un puesto.</p>
 <section class="panel"><form id="lookup"><label>Código del taller<input id="code" required pattern="[A-Za-z0-9_-]{3,24}" autocomplete="off"></label><label>DNI<input id="dni" required autocomplete="off"></label><button style="margin-top:16px">Comprobar datos</button></form>
-<div id="confirmation" hidden><h2 id="workshopTitle"></h2><p id="details"></p><label style="display:flex;align-items:center"><input id="consent" type="checkbox" style="width:auto">Confirmo que soy esta persona y que he impartido este taller.</label><button id="sign" style="margin-top:16px">Firmar como formador</button></div><p id="status" role="status" aria-live="polite"></p></section></main>
+<div id="confirmation" hidden><h2 id="workshopTitle"></h2><p id="details"></p><label style="display:flex;align-items:center"><input id="consent" type="checkbox" style="width:auto">Confirmo que soy esta persona y que he impartido este taller.</label><button id="sign" style="margin-top:16px">Firmar como formador</button></div><p id="status" role="status" aria-live="polite"></p></section><section id="trainerResources" class="panel" hidden><h2>Recursos del taller</h2><p class="small">Puedes publicar para todos los recursos de «Solo formadores».</p><div id="trainerResourceList" class="resources-list"></div><p id="resourceStatus" role="status" aria-live="polite"></p></section></main>
 <script type="module">
+import {visibleResources, visibility, publishResource} from './resource-access.mjs';
 import {db} from './firebase.js';
-import {doc,getDoc,runTransaction} from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
+import {doc,getDoc,runTransaction,onSnapshot} from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
 const byId = id => document.getElementById(id);
 byId('code').value = new URLSearchParams(location.search).get('workshop') || '';
 let identity = null;
+let stopResources = null;
+let lookupVersion = 0;
+function clearResources(){
+  if (stopResources) stopResources();
+  stopResources = null;
+  byId('trainerResources').hidden = true;
+  byId('trainerResourceList').replaceChildren();
+}
+function showResources(personId){
+  clearResources();
+  stopResources = onSnapshot(doc(db,'workshops',personId.code), snap => {
+    if (!identity || identity.code !== personId.code || identity.dni !== personId.dni) return;
+    const ws = snap.exists() ? snap.data() : {};
+    if (!(ws.trainers || []).some(p => p.dni === personId.dni) || !(ws.trainerSignatures || []).some(p => p.dni === personId.dni && p.signed)){
+      clearResources(); byId('status').textContent = 'Tu acceso ha cambiado. Comprueba tus datos de nuevo.'; return;
+    }
+    const list = byId('trainerResourceList'); list.replaceChildren();
+    const resources = visibleResources(ws.resources || [], 'trainer');
+    if (!resources.length) list.textContent = 'No hay recursos disponibles todavía.';
+    for (const resource of resources){
+      const card = document.createElement('article'); card.className = 'resource-chip';
+      const title = document.createElement('strong'); title.textContent = resource.title || resource.fileName || 'Recurso'; card.appendChild(title);
+      const badge = document.createElement('span'); badge.textContent = visibility(resource) === 'trainers' ? 'Solo formadores' : 'Todos'; card.appendChild(badge);
+      if(resource.content || resource.description){
+        const text = document.createElement('p'); text.style.whiteSpace = 'pre-wrap'; text.textContent = resource.content || resource.description; card.appendChild(text);
+      }
+      if(resource.url && /^https?:\/\//i.test(resource.url)){
+        const link = document.createElement('a'); link.href = resource.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Abrir recurso'; card.appendChild(link);
+      }
+      if(visibility(resource) === 'trainers' && resource.id){
+        const button = document.createElement('button'); button.className = 'secondary'; button.textContent = 'Publicar para todos';
+        button.onclick = async () => {
+          button.disabled = true; byId('resourceStatus').textContent = 'Publicando…';
+          try {
+            if (!identity || identity.code !== personId.code || identity.dni !== personId.dni) throw new Error('Comprueba tus datos de nuevo.');
+            await runTransaction(db, async tx => {
+              const target = doc(db,'workshops',personId.code), latest = await tx.get(target);
+              if (!latest.exists()) throw new Error('El taller ya no existe.');
+              tx.update(target,{resources:publishResource(latest.data(),personId.dni,resource.id)});
+            });
+            byId('resourceStatus').textContent = 'Recurso publicado para todos.';
+          } catch(err){ byId('resourceStatus').textContent = 'No se pudo publicar: ' + err.message; }
+          finally { button.disabled = false; }
+        };
+        card.appendChild(button);
+      }
+      list.appendChild(card);
+    }
+    byId('trainerResources').hidden = false;
+  }, err => { clearResources(); byId('status').textContent = 'No se pudieron cargar los recursos: ' + err.message; });
+}
+
 byId('lookup').onsubmit = async event => {
-  event.preventDefault(); identity = null; byId('confirmation').hidden = true; byId('consent').checked = false;
+  event.preventDefault(); const version = ++lookupVersion; clearResources(); identity = null; byId('confirmation').hidden = true; byId('consent').checked = false;
   const button = event.submitter; button.disabled = true; byId('status').textContent = 'Comprobando…';
   try {
     const code = byId('code').value.trim().toUpperCase(), dni = byId('dni').value.trim().toUpperCase();
     const snap = await getDoc(doc(db,'workshops',code));
+    if (version !== lookupVersion) return;
     if(!snap.exists()) throw new Error('No existe este taller.');
     const ws = snap.data(), person = (ws.trainers || []).find(p => p.dni.toUpperCase() === dni);
     if(!person) throw new Error('No estás inscrito como formador. Contacta con el administrador.');
-    if((ws.trainerSignatures || []).some(p => p.dni === person.dni)) { byId('status').textContent = 'Tu asistencia como formador ya está firmada.'; return; }
     identity = {code,dni:person.dni};
+    if((ws.trainerSignatures || []).some(p => p.dni === person.dni && p.signed)) { byId('status').textContent = 'Tu asistencia como formador ya está firmada.'; showResources({...identity}); return; }
     byId('workshopTitle').textContent = ws.title || code;
     byId('details').textContent = [person.name,person.email,ws.place,ws.schedule].filter(Boolean).join(' · ');
     byId('confirmation').hidden = false; byId('status').textContent = '';
@@ -111,10 +165,11 @@ byId('sign').onclick = async () => {
       if(signatures.some(p => p.dni === person.dni)) return;
       tx.update(target,{trainerSignatures:[...signatures,{dni:person.dni,name:person.name,email:person.email,signed:true,timestamp:new Date().toISOString()}]});
     });
-    byId('confirmation').hidden = true; identity = null;
-    byId('status').textContent = 'Asistencia firmada correctamente. Ya puedes cerrar esta página.';
+    byId('confirmation').hidden = true;
+    if (identity?.code === personId.code && identity?.dni === personId.dni) showResources(personId);
+    byId('status').textContent = 'Asistencia firmada correctamente. Ya puedes acceder a los recursos.';
   } catch(err) { byId('status').textContent = 'No se pudo guardar la firma: ' + err.message; }
   finally { byId('sign').disabled = false; byId('lookup').querySelector('button').disabled = false; }
 };
-for(const id of ['code','dni']) byId(id).oninput = () => { identity = null; byId('confirmation').hidden = true; };
+for(const id of ['code','dni']) byId(id).oninput = () => { lookupVersion++; clearResources(); identity = null; byId('confirmation').hidden = true; };
 </script></body></html>

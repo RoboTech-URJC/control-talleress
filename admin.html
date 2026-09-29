@@ -171,7 +171,7 @@
         </div>
 
         <div id="editResources" class="card edit-shell" style="display:none;">
-          <div><p class="eyebrow">Recursos</p><h2>Publicar archivos</h2><p class="small">Publica enlaces, bloques de texto o archivos subidos (PDF, imágenes, ZIP, etc.). Los usuarios los verán después de fichar.</p></div>
+          <div><p class="eyebrow">Recursos</p><h2>Publicar archivos</h2><p class="small">Publica enlaces, bloques de texto o archivos subidos (PDF, imágenes, ZIP, etc.). Elige su visibilidad. Los formadores que hayan firmado pueden publicar para todos los recursos de «Solo formadores».</p></div>
           <label>Subir archivos (máximo 25 MB por archivo)<input id="bulkFiles" type="file" multiple></label><p id="resourceStatus" role="status" aria-live="polite"></p><div id="editResourcesInputs"></div>
           <div class="button-row"><button onclick="saveResourceChanges()">Guardar recursos</button><button class="secondary" onclick="closeEditResources()">Cerrar</button></div>
         </div>
@@ -181,6 +181,7 @@
 
   <dialog id="seatDialog"><h2 id="seatDialogTitle"></h2><p id="seatDialogInfo"></p><p class="small">Liberar un puesto ocupado deshace la firma del alumno, pero mantiene su inscripción. Bloquearlo impide que se seleccione.</p><div class="button-row"><button id="releaseSeat">Liberar puesto</button><button id="blockSeat">Bloquear puesto</button><button class="secondary" onclick="document.getElementById('seatDialog').close()">Cerrar</button></div><p id="seatStatus" role="status"></p></dialog>
   <script type="module">
+  import { visibility } from './resource-access.mjs';
   import { seatChange, personChange } from './attendance.mjs';
   import { createRacsWorkbook, racsNicks } from './racs.mjs';
   import { db, auth, storage, onAuthStateChanged, signInWithEmailAndPassword, signOut } from './firebase.js';
@@ -192,6 +193,7 @@
   let editingDetailsId = null;
   let peopleRole = 'attendees';
   let editingResourcesWorkshopId = null;
+  let originalResources = [];
   let unsubscribeWorkshops = null;
   let currentAdminUser = null;
 
@@ -354,13 +356,13 @@
         classroomDiv.appendChild(seatDiv);
       }
       const resourcesDiv = document.getElementById(`workshop_${ws.id}_resources`);
-      resourcesDiv.innerHTML = resources.length ? resources.map((r,i)=>`<div class="resource-chip">${r.url ? `<a href="${escapeHtml(r.url)}" target="_blank" rel="noreferrer">${escapeHtml(r.title || `Recurso ${i+1}`)}</a>` : `<strong>${escapeHtml(r.title || `Recurso ${i+1}`)}</strong>`}<span>${escapeHtml(r.type === 'text' ? (r.content || '').slice(0,120) : (r.description || r.fileName || r.url || ''))}</span></div>`).join('') : '<p class="small">Sin recursos publicados.</p>';
+      resourcesDiv.innerHTML = resources.length ? resources.map((r,i)=>`<div class="resource-chip">${r.url ? `<a href="${escapeHtml(r.url)}" target="_blank" rel="noreferrer">${escapeHtml(r.title || `Recurso ${i+1}`)}</a>` : `<strong>${escapeHtml(r.title || `Recurso ${i+1}`)}</strong>`}<span>${escapeHtml(({hidden:"Oculto",trainers:"Solo formadores",all:"Todos"})[visibility(r)] || "Oculto")}</span><span>${escapeHtml(r.type === 'text' ? (r.content || '').slice(0,120) : (r.description || r.fileName || r.url || ''))}</span></div>`).join('') : '<p class="small">Sin recursos publicados.</p>';
     });
   }
 
   function resourceRowTemplate(res = {}, idx = 0) {
     const type = res.type || (res.content ? 'text' : 'link');
-    return `<div class="resource-row" data-resource-row>
+    return `<div class="resource-row" data-resource-row data-resource-id="${escapeHtml(res.id || crypto.randomUUID())}">
       <div class="resource-grid">
         <label>Tipo
           <select data-resource-type onchange="syncResourceRow(this.closest('[data-resource-row]'))">
@@ -371,6 +373,11 @@
         </label>
         <label>Título<input type="text" data-resource-title value="${escapeHtml(res.title)}" placeholder="Nombre visible"></label>
       </div>
+      <label>Visibilidad<select data-resource-visibility>
+        <option value="hidden" ${visibility(res) === 'hidden' ? 'selected' : ''}>Oculto</option>
+        <option value="trainers" ${visibility(res) === 'trainers' ? 'selected' : ''}>Solo formadores</option>
+        <option value="all" ${visibility(res) === 'all' ? 'selected' : ''}>Todos</option>
+      </select></label>
       <label data-link-field>URL<input type="url" data-resource-url value="${escapeHtml(res.url)}" placeholder="https://..."></label>
       <label data-text-field>Texto<textarea data-resource-content placeholder="Contenido que verá el asistente">${escapeHtml(res.content)}</textarea></label>
       <label data-file-field>Archivo<input type="file" data-resource-file accept="image/*,.pdf,.zip,.txt,.csv,.doc,.docx,.ppt,.pptx"></label>
@@ -399,6 +406,7 @@
     const docSnap = await getDoc(doc(db,'workshops',id));
     if(!docSnap.exists()){ alert('No existe'); return; }
     const ws = docSnap.data();
+    originalResources = ws.resources || [];
     const resources = ws.resources && ws.resources.length ? ws.resources : [];
     const container = document.getElementById('editResourcesInputs');
     container.innerHTML = `<h3>Recursos para ${escapeHtml(ws.code)}</h3>` + resources.map(resourceRowTemplate).join('') + `<button type="button" onclick="addResourceRow()">Añadir recurso</button>`;
@@ -409,7 +417,7 @@
 
   window.addResourceRow = function(){
     const button = document.querySelector('#editResourcesInputs > button:last-child');
-    button.insertAdjacentHTML('beforebegin', resourceRowTemplate({type:'file'}));
+    button.insertAdjacentHTML('beforebegin', resourceRowTemplate({type:'file',visibility:'hidden'}));
     syncAllResourceRows();
   };
 
@@ -427,9 +435,10 @@
       const type = row.querySelector('[data-resource-type]').value;
       const title = row.querySelector('[data-resource-title]').value.trim();
       const description = row.querySelector('[data-resource-desc]').value.trim();
+      const access = {id:row.dataset.resourceId, visibility:row.querySelector('[data-resource-visibility]').value};
       if (type === 'text') {
         const content = row.querySelector('[data-resource-content]').value.trim();
-        if (content) resources.push({ type:'text', title, description, content });
+        if (content) resources.push({ ...access, type:'text', title, description, content });
       } else if (type === 'file') {
         const input = row.querySelector('[data-resource-file]');
         let url = row.querySelector('[data-existing-url]').value;
@@ -452,14 +461,20 @@
           row.querySelector('[data-existing-file-name]').value = fileName;
           input.value = '';
         }
-        if (url) resources.push({ type: mime.startsWith('image/') ? 'image' : 'file', title, description, url, mime, fileName });
+        if (url) resources.push({ ...access, type: mime.startsWith('image/') ? 'image' : 'file', title, description, url, mime, fileName });
       } else {
         const url = row.querySelector('[data-resource-url]').value.trim();
         if (url && !/^https?:\/\//i.test(url)) throw new Error('Usa enlaces http:// o https://');
-        if (url) resources.push({ type:'link', title, description, url });
+        if (url) resources.push({ ...access, type:'link', title, description, url });
       }
     }
-    await updateDoc(doc(db,'workshops',editingResourcesWorkshopId), { resources });
+    await runTransaction(db, async tx => {
+      const target = doc(db,'workshops',editingResourcesWorkshopId);
+      const snap = await tx.get(target);
+      if (!snap.exists()) throw new Error('El taller ya no existe.');
+      if (JSON.stringify(snap.data().resources || []) !== JSON.stringify(originalResources)) throw new Error('Los recursos han cambiado mientras editabas. Cierra y vuelve a abrir Recursos para revisar la versión actual.');
+      tx.update(target, {resources});
+    });
     document.getElementById('editResources').style.display='none';
     } catch(err) { status.textContent = 'No se guardaron los recursos. ' + (err.code?.startsWith('storage/') ? 'Comprueba que Firebase Storage está habilitado y permite subir archivos con tu cuenta. ' : '') + err.message; }
     finally { controls.forEach(el => el.disabled = false); }
